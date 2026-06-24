@@ -126,15 +126,15 @@ export default function DashboardPage() {
               <Ghost className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight">
+              <h1 className="font-heading text-3xl lg:text-4xl font-semibold tracking-tight text-[#F4F6FF]">
                 {isPackageDeployed && hasAgent
                   ? `Welcome back, ${agent?.display_name || "Agent"}`
                   : "Welcome back"}
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-base text-[#A7B0C8] mt-1">
                 {isPackageDeployed && hasAgent
                   ? `Agent #${agent?.id?.id?.slice(0, 8) || ""} — ${txnCount} transactions`
-                  : "Your agent is ready. Here&apos;s your financial overview."}
+                  : "Your agent is ready. Here's your financial overview."}
               </p>
             </div>
           </div>
@@ -171,7 +171,7 @@ export default function DashboardPage() {
                   <motion.div
                     key={stat.label}
                     variants={itemVariants}
-                    className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 hover:shadow-md transition-all duration-300"
+                    className="group relative overflow-hidden rounded-xl p-5 hover:bg-[rgba(255,255,255,0.03)] transition-all duration-300"
                   >
                     <div className={cn(
                       "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100 transition-opacity duration-500",
@@ -196,8 +196,8 @@ export default function DashboardPage() {
                         </span>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-2xl font-semibold tracking-tight">{stat.value}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="font-heading text-3xl font-semibold tracking-tight text-[#F4F6FF]">{stat.value}</p>
+                        <p className="text-xs text-[#A7B0C8]">
                           {stat.label} • {stat.unit}
                         </p>
                       </div>
@@ -209,7 +209,7 @@ export default function DashboardPage() {
 
             {/* Quick Actions */}
             <motion.div variants={itemVariants}>
-              <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Quick Actions</h2>
+              <h2 className="font-heading text-sm font-medium text-[#A7B0C8] mb-3 uppercase tracking-wider">Quick Actions</h2>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
                   { label: "Send Payment", icon: Send, href: "/payments", desc: "Transfer funds globally" },
@@ -222,7 +222,7 @@ export default function DashboardPage() {
                     <a
                       key={action.label}
                       href={action.href}
-                      className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-card hover:bg-accent/50 transition-all duration-200 group cursor-pointer"
+                      className="flex flex-col gap-2 p-4 rounded-xl bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(179,71,255,0.1)] transition-all duration-200 group cursor-pointer"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary">
@@ -231,8 +231,8 @@ export default function DashboardPage() {
                         <ArrowUpRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">{action.label}</p>
-                        <p className="text-xs text-muted-foreground">{action.desc}</p>
+                        <p className="font-heading text-sm font-medium text-[#F4F6FF]">{action.label}</p>
+                        <p className="text-xs text-[#A7B0C8]">{action.desc}</p>
                       </div>
                     </a>
                   );
@@ -244,15 +244,15 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Activity Feed */}
               <motion.div variants={itemVariants} className="lg:col-span-2">
-                <div className="rounded-xl border border-border bg-card">
-                  <div className="flex items-center justify-between p-5 border-b border-border">
+                <div className="rounded-xl bg-[rgba(255,255,255,0.02)]">
+                  <div className="flex items-center justify-between p-5">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-muted-foreground" />
-                      <h3 className="text-sm font-medium">{isPackageDeployed ? "Recent Payments" : "Recent Activity"}</h3>
+                      <h3 className="font-heading text-lg font-medium text-[#F4F6FF]">{isPackageDeployed ? "Recent Payments" : "Recent Activity"}</h3>
                     </div>
-                    <span className="text-xs text-muted-foreground">{isPackageDeployed ? `${recentActivity.length} transactions` : "Last 24 hours"}</span>
+                    <span className="text-xs text-[#A7B0C8]">{isPackageDeployed ? `${recentActivity.length} transactions` : "Last 24 hours"}</span>
                   </div>
-                  <div className="divide-y divide-border">
+                  <div className="divide-y divide-[rgba(255,255,255,0.05)]">
                     {recentActivity.length === 0 ? (
                       <div className="p-8 text-center text-sm text-muted-foreground">
                         No activity yet. Deploy the contract to start transacting.
@@ -299,21 +299,21 @@ export default function DashboardPage() {
 
               {/* Agent Status */}
               <motion.div variants={itemVariants}>
-                <div className="rounded-xl border border-border bg-card p-5 h-full">
+                <div className="rounded-xl bg-[rgba(255,255,255,0.02)] p-5 h-full">
                   <div className="flex items-center gap-2 mb-4">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                    <h3 className="text-sm font-medium">Agent Status</h3>
+                    <Sparkles className="w-4 h-4 text-[#B347FF]" />
+                    <h3 className="font-heading text-lg font-medium text-[#F4F6FF]">Agent Status</h3>
                   </div>
                   <div className="space-y-4">
-                    <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success/10">
-                        <div className="w-3 h-3 rounded-full bg-success animate-pulse-soft" />
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-[rgba(255,255,255,0.05)]">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[rgba(179,71,255,0.1)]">
+                        <div className="w-3 h-3 rounded-full bg-[#B347FF] animate-pulse-soft" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">
+                        <p className="font-heading text-sm font-medium text-[#F4F6FF]">
                           {isPackageDeployed && hasAgent ? (agent?.active ? "Active" : "Inactive") : "Ready"}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-[#A7B0C8]">
                           {isPackageDeployed && hasAgent
                             ? agent?.display_name || "GhostPay Agent"
                             : "Awaiting contract deployment"}
@@ -328,8 +328,8 @@ export default function DashboardPage() {
                         { label: "Gas Balance", value: "Sponsored" },
                       ].map((item) => (
                         <div key={item.label} className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">{item.label}</span>
-                          <span className="font-medium font-mono text-xs">{item.value}</span>
+                          <span className="text-[#A7B0C8]">{item.label}</span>
+                          <span className="font-medium font-mono text-xs text-[#F4F6FF]">{item.value}</span>
                         </div>
                       ))}
                     </div>

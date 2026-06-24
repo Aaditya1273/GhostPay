@@ -10,7 +10,7 @@
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 221.2 83.2% 53.3%;
+    --primary: 275 100% 64%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 20% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -26,7 +26,7 @@
     --warning-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 275 100% 64%;
     --radius: 0.75rem;
 
     /* GhostPay brand colors */
@@ -34,15 +34,15 @@
     --brand-100: 221 85% 92%;
     --brand-200: 221 75% 85%;
     --brand-300: 221 70% 70%;
-    --brand-400: 221 75% 60%;
-    --brand-500: 221.2 83.2% 53.3%;
-    --brand-600: 221 80% 45%;
+    --brand-400: 275 75% 70%;
+    --brand-500: 275 100% 64%;
+    --brand-600: 275 80% 55%;
     --brand-700: 221 75% 35%;
     --brand-800: 221 70% 25%;
     --brand-900: 221 65% 15%;
 
     /* Chart colors */
-    --chart-1: 221.2 83.2% 53.3%;
+    --chart-1: 275 100% 64%;
     --chart-2: 142 71% 45%;
     --chart-3: 38 92% 50%;
     --chart-4: 271 81% 56%;
@@ -66,7 +66,7 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 6.5%;
     --popover-foreground: 0 0% 98%;
-    --primary: 221.2 83.2% 53.3%;
+    --primary: 275 100% 64%;
     --primary-foreground: 210 40% 98%;
     --secondary: 240 4% 16%;
     --secondary-foreground: 0 0% 98%;
@@ -82,21 +82,21 @@
     --warning-foreground: 210 40% 98%;
     --border: 240 4% 16%;
     --input: 240 4% 16%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 275 100% 64%;
 
     /* GhostPay brand colors (dark) */
     --brand-50: 221 65% 15%;
     --brand-100: 221 70% 20%;
     --brand-200: 221 75% 30%;
     --brand-300: 221 80% 40%;
-    --brand-400: 221 83% 48%;
-    --brand-500: 221.2 83.2% 53.3%;
-    --brand-600: 221 80% 60%;
+    --brand-400: 275 83% 48%;
+    --brand-500: 275 100% 64%;
+    --brand-600: 275 80% 60%;
     --brand-700: 221 75% 70%;
     --brand-800: 221 80% 82%;
     --brand-900: 221 85% 92%;
 
-    --chart-1: 221.2 83.2% 53.3%;
+    --chart-1: 275 100% 64%;
     --chart-2: 142 71% 45%;
     --chart-3: 38 92% 50%;
     --chart-4: 271 81% 56%;

@@ -202,15 +202,15 @@ export default function VaultPage() {
                 <Database className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight">Memory Vault</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="font-heading text-3xl lg:text-4xl font-semibold tracking-tight text-[#F4F6FF]">Memory Vault</h1>
+                <p className="text-base text-[#A7B0C8] mt-1">
                   Encrypted storage powered by Walrus — private by default
                 </p>
               </div>
             </div>
             {isConnected && (
               <Button
-                className="gap-2 hidden sm:flex"
+                className="gap-2 hidden sm:flex bg-[#B347FF] text-[#0B0C10] rounded-full font-semibold hover:bg-[#A03FE6]"
                 onClick={() => setShowUploadModal(true)}
               >
                 <Upload className="w-4 h-4" />
@@ -256,35 +256,35 @@ export default function VaultPage() {
 
             {/* Storage Overview */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-              <div className="lg:col-span-3 rounded-xl border border-border bg-card p-6">
+              <div className="lg:col-span-3 rounded-xl bg-[rgba(255,255,255,0.02)] p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Database className="w-4 h-4 text-primary" />
-                    <h3 className="text-sm font-medium">Storage Usage</h3>
+                    <Database className="w-4 h-4 text-[#B347FF]" />
+                    <h3 className="font-heading text-lg font-medium text-[#F4F6FF]">Storage Usage</h3>
                   </div>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-[#A7B0C8]">
                     {isPackageDeployed
                       ? `${totalSizeMB.toFixed(1)} MB of 10 GB used`
                       : "2.4 GB of 10 GB used"}
                   </span>
                 </div>
-                <div className="h-2 rounded-full bg-accent overflow-hidden">
+                <div className="h-2 rounded-full bg-[rgba(255,255,255,0.05)] overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: isPackageDeployed ? `${Math.min(totalSizeMB / 100, 100)}%` : "24%" }}
                     transition={{ duration: 1, ease: "easeOut" }}
-                    className="h-full rounded-full bg-gradient-to-r from-primary to-purple-500"
+                    className="h-full rounded-full bg-gradient-to-r from-[#B347FF] to-purple-500"
                   />
                 </div>
-                <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between mt-2 text-xs text-[#A7B0C8]">
                   <span>{isPackageDeployed ? `${(totalSizeMB / 100).toFixed(1)}% used` : "24% used"}</span>
                   <span>{isPackageDeployed ? `${(10000 - totalSizeMB).toFixed(1)} MB free` : "7.6 GB free"}</span>
                 </div>
               </div>
-              <div className="rounded-xl border border-border bg-card p-4 flex flex-col items-center justify-center">
+              <div className="rounded-xl bg-[rgba(255,255,255,0.02)] p-4 flex flex-col items-center justify-center">
                 <Lock className="w-8 h-8 text-success mb-2" />
-                <p className="text-sm font-medium">End-to-End Encrypted</p>
-                <p className="text-xs text-muted-foreground">SEAL + Walrus</p>
+                <p className="font-heading text-sm font-medium text-[#F4F6FF]">End-to-End Encrypted</p>
+                <p className="text-xs text-[#A7B0C8]">SEAL + Walrus</p>
               </div>
             </div>
 
@@ -308,7 +308,7 @@ export default function VaultPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.06 }}
-                    className="group rounded-xl border border-border bg-card p-5 hover:shadow-md hover:border-primary/20 transition-all duration-300 cursor-pointer"
+                    className="group rounded-xl bg-[rgba(255,255,255,0.02)] p-5 hover:bg-[rgba(255,255,255,0.04)] transition-all duration-300 cursor-pointer"
                     onClick={() => memory.blobId && handleViewBlob(memory.blobId, memory.name)}
                   >
                     <div className="flex items-start justify-between mb-3">
@@ -332,8 +332,8 @@ export default function VaultPage() {
                         {memory.status}
                       </div>
                     </div>
-                    <h4 className="text-sm font-medium mb-1 truncate">{memory.name}</h4>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <h4 className="font-heading text-lg font-medium mb-1 truncate text-[#F4F6FF]">{memory.name}</h4>
+                    <div className="flex items-center justify-between text-xs text-[#A7B0C8]">
                       <span>{memory.size}</span>
                       <span>{memory.date}</span>
                     </div>
@@ -343,12 +343,12 @@ export default function VaultPage() {
             </div>
 
             {/* Info Banner */}
-            <div className="rounded-xl border border-border bg-gradient-to-r from-primary/5 to-purple-500/5 p-5">
+            <div className="rounded-xl bg-[rgba(179,71,255,0.05)] border border-[rgba(179,71,255,0.1)] p-5">
               <div className="flex items-start gap-3">
-                <Shield className="w-5 h-5 text-primary mt-0.5" />
+                <Shield className="w-5 h-5 text-[#B347FF] mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium mb-1">Private by Default</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="font-heading text-lg font-medium mb-1 text-[#F4F6FF]">Private by Default</p>
+                  <p className="text-xs text-[#A7B0C8]">
                     All data is encrypted with SEAL before being stored on Walrus. Only you and
                     authorized view-key holders can decrypt your memories. No one else — not even GhostPay — can access your data.
                   </p>

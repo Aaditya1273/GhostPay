@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Wallet,
@@ -43,7 +44,7 @@ const itemVariants = {
 
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isConnected, logout, redirectToAuthUrl, emailAddress, address } = useCustomWallet();
+  const { isConnected, logout, redirectToAuthUrl, emailAddress, address, isUsingEnoki } = useCustomWallet();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -53,7 +54,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
   }, [pathname]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-[#0B0C10] text-[#F4F6FF] font-sans">
       {/* Mobile overlay */}
       <AnimatePresence>
         {mobileMenuOpen && (
@@ -75,7 +76,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
             animate={{ x: 0 }}
             exit={{ x: -280 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border lg:hidden"
+            className="fixed inset-y-0 left-0 z-50 w-64 bg-[#0B0C10] lg:hidden"
           >
             <div className="flex h-full flex-col">
               <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
@@ -83,7 +84,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
                   <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary">
                     <Ghost className="w-4 h-4 text-primary-foreground" />
                   </div>
-                  <span className="font-semibold text-sidebar-foreground">GhostPay</span>
+                  <span className="font-heading font-semibold text-[#F4F6FF]">Ghost<span className="text-[#B347FF]">Pay</span></span>
                 </Link>
                 <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}>
                   <X className="w-5 h-5" />
@@ -100,8 +101,8 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
                       className={cn(
                         "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                         isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                          ? "bg-[rgba(179,71,255,0.1)] text-[#B347FF]"
+                          : "text-[#A7B0C8] hover:text-[#F4F6FF] hover:bg-[rgba(255,255,255,0.05)]"
                       )}
                     >
                       <Icon className="w-5 h-5 flex-shrink-0" />
@@ -112,17 +113,29 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
               </nav>
               <div className="p-4 border-t border-sidebar-border">
                 {isConnected ? (
-                  <button
-                    onClick={logout}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 w-full transition-all duration-200"
-                  >
-                    <Avatar className="w-6 h-6">
-                      <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                        {emailAddress?.[0]?.toUpperCase() || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="truncate">{emailAddress || "Sign Out"}</span>
-                  </button>
+                  isUsingEnoki ? (
+                    <button
+                      onClick={logout}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 w-full transition-all duration-200"
+                    >
+                      <Avatar className="w-6 h-6">
+                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                          {emailAddress?.[0]?.toUpperCase() || "G"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="truncate">{emailAddress || "Sign Out"}</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={logout}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#A7B0C8] hover:text-[#F4F6FF] hover:bg-[rgba(255,255,255,0.05)] w-full transition-all duration-200"
+                    >
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[rgba(255,255,255,0.05)] text-[#A7B0C8]">
+                        <Wallet className="w-3 h-3" />
+                      </div>
+                      <span className="truncate">Disconnect Wallet</span>
+                    </button>
+                  )
                 ) : null}
               </div>
             </div>
@@ -135,10 +148,10 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
         animate={sidebarOpen ? "expanded" : "collapsed"}
         variants={sidebarVariants}
         transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="hidden lg:flex flex-col bg-sidebar border-r border-sidebar-border overflow-hidden"
+        className="hidden lg:flex flex-col bg-[#0B0C10] overflow-hidden"
       >
         <div className={cn(
-          "flex h-16 items-center border-b border-sidebar-border",
+          "flex h-16 items-center",
           sidebarOpen ? "px-6 justify-between" : "px-4 justify-center"
         )}>
           {sidebarOpen ? (
@@ -147,7 +160,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
                 <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary">
                   <Ghost className="w-4 h-4 text-primary-foreground" />
                 </div>
-                <span className="font-semibold text-sidebar-foreground">GhostPay</span>
+                <span className="font-heading font-semibold text-[#F4F6FF]">Ghost<span className="text-[#B347FF]">Pay</span></span>
               </Link>
               <Button
                 variant="ghost"
@@ -181,8 +194,8 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 relative group",
                   sidebarOpen ? "" : "justify-center",
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    ? "bg-[rgba(179,71,255,0.1)] text-[#B347FF]"
+                    : "text-[#A7B0C8] hover:text-[#F4F6FF] hover:bg-[rgba(255,255,255,0.05)]"
                 )}
               >
                 <Icon className={cn("w-5 h-5 flex-shrink-0", isActive && "text-primary")} />
@@ -206,35 +219,62 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
           })}
         </nav>
         <div className={cn(
-          "p-3 border-t border-sidebar-border",
+          "p-3",
           sidebarOpen ? "" : "flex justify-center"
         )}>
           {isConnected ? (
             sidebarOpen ? (
-              <button
-                onClick={logout}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 w-full transition-all duration-200"
-              >
+              isUsingEnoki ? (
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 w-full transition-all duration-200"
+                >
+                  <Avatar className="w-6 h-6">
+                    <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                      {emailAddress?.[0]?.toUpperCase() || "G"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{emailAddress || "Sign Out"}</span>
+                </button>
+              ) : (
+                <div className="flex flex-col gap-2 w-full">
+                  <button
+                    onClick={redirectToAuthUrl}
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-[#B347FF] text-[#0B0C10] hover:scale-105 transition-all duration-200 w-full"
+                  >
+                    <Image src="/google.png" alt="Google" width={16} height={16} />
+                    Sign in with Google
+                  </button>
+                  <button
+                    onClick={logout}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#A7B0C8] hover:text-[#F4F6FF] hover:bg-[rgba(255,255,255,0.05)] w-full transition-all duration-200"
+                  >
+                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[rgba(255,255,255,0.05)] text-[#A7B0C8]">
+                      <Wallet className="w-3 h-3" />
+                    </div>
+                    <span className="truncate">Disconnect Wallet</span>
+                  </button>
+                </div>
+              )
+            ) : (
+              isUsingEnoki ? (
                 <Avatar className="w-6 h-6">
                   <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                    {emailAddress?.[0]?.toUpperCase() || "U"}
+                    {emailAddress?.[0]?.toUpperCase() || "G"}
                   </AvatarFallback>
                 </Avatar>
-                <span className="truncate">{emailAddress || "Sign Out"}</span>
-              </button>
-            ) : (
-              <Avatar className="w-6 h-6">
-                <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                  {emailAddress?.[0]?.toUpperCase() || "U"}
-                </AvatarFallback>
-              </Avatar>
+              ) : (
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[rgba(255,255,255,0.05)] text-[#A7B0C8]" title="Disconnect Wallet" onClick={logout}>
+                  <Wallet className="w-4 h-4" />
+                </div>
+              )
             )
           ) : null}
         </div>
       </motion.aside>        {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Topbar */}
-        <header className="flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur-xl px-4 lg:px-6">
+        <header className="flex h-16 items-center gap-4 bg-[#0B0C10]/80 backdrop-blur-xl px-4 lg:px-6">
           <div className="flex items-center gap-3 lg:hidden">
             <Button
               variant="ghost"
@@ -247,7 +287,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
               <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary">
                 <Ghost className="w-3.5 h-3.5 text-primary-foreground" />
               </div>
-              <span className="font-semibold text-sm">GhostPay</span>
+              <span className="font-heading font-semibold text-sm text-[#F4F6FF]">Ghost<span className="text-[#B347FF]">Pay</span></span>
             </Link>
           </div>
 
@@ -256,32 +296,55 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
           <div className="flex items-center gap-2">
             {isConnected ? (
               <>
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50 text-sm text-muted-foreground">
-                  <span className="w-2 h-2 rounded-full bg-success" />
-                  <span className="font-mono text-xs">
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.05)] text-sm text-[#A7B0C8]">
+                  <span className="w-2 h-2 rounded-full bg-[#B347FF]" />
+                  <span className="font-mono text-xs text-[#F4F6FF]">
                     {address?.slice(0, 6)}...{address?.slice(-4)}
                   </span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={logout}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Avatar className="w-7 h-7">
-                    <AvatarImage src="" />
-                    <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                      {emailAddress?.[0]?.toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
+                {isUsingEnoki ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={logout}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <Avatar className="w-7 h-7">
+                      <AvatarImage src="" />
+                      <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                        {emailAddress?.[0]?.toUpperCase() || "G"}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      onClick={redirectToAuthUrl}
+                      size="sm"
+                      className="gap-2 bg-[rgba(255,255,255,0.05)] text-[#F4F6FF] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.1)] ml-2"
+                    >
+                      <Image src="/google.png" alt="Google" width={16} height={16} />
+                      Sign in with Google
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={logout}
+                      className="text-[#A7B0C8] hover:text-[#F4F6FF] bg-[rgba(255,255,255,0.05)] ml-2 rounded-full"
+                      title="Disconnect Wallet"
+                    >
+                      <Wallet className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
               </>
             ) : (
               <Button
                 onClick={redirectToAuthUrl}
                 size="sm"
-                className="gap-2"
+                className="gap-2 bg-[#B347FF] text-[#0B0C10] hover:scale-105 transition-all duration-300 rounded-full font-semibold px-6"
               >
+                <Image src="/google.png" alt="Google" width={16} height={16} />
                 Sign in with Google
               </Button>
             )}
@@ -289,7 +352,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-grid">
+        <main className="flex-1 overflow-y-auto bg-[#0B0C10]">
           <div className="animate-page-in">
             {children}
           </div>
@@ -297,7 +360,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-xl border-t border-border lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[#0B0C10]/95 backdrop-blur-xl lg:hidden">
         <div className="flex items-center justify-around h-16 px-2">
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
@@ -309,8 +372,8 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
                 className={cn(
                   "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200",
                   isActive
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "text-[#B347FF]"
+                    : "text-[#A7B0C8] hover:text-[#F4F6FF]"
                 )}
               >
                 <Icon className="w-5 h-5" />

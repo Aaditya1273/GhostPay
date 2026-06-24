@@ -82,8 +82,8 @@ export default function PaymentsPage() {
                 <Send className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight">Payments</h1>
-                <p className="text-sm text-muted-foreground">Send and receive funds globally</p>
+                <h1 className="font-heading text-3xl lg:text-4xl font-semibold tracking-tight text-[#F4F6FF]">Payments</h1>
+                <p className="text-base text-[#A7B0C8] mt-1">Send and receive funds globally</p>
               </div>
             </div>
             {isConnected && (
@@ -135,14 +135,14 @@ export default function PaymentsPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.1 }}
-                    className="rounded-xl border border-border bg-card p-4"
+                    className="rounded-xl bg-[rgba(255,255,255,0.02)] p-4"
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <Icon className={cn("w-4 h-4", stat.color)} />
-                      <span className="text-xs text-muted-foreground">{stat.label}</span>
+                      <span className="text-xs text-[#A7B0C8]">{stat.label}</span>
                     </div>
-                    <p className="text-xl font-semibold">{stat.value}</p>
-                    <p className="text-xs text-muted-foreground">{stat.unit}</p>
+                    <p className="font-heading text-2xl font-semibold text-[#F4F6FF]">{stat.value}</p>
+                    <p className="text-xs text-[#A7B0C8]">{stat.unit}</p>
                   </motion.div>
                 );
               })}
@@ -168,22 +168,22 @@ export default function PaymentsPage() {
             </div>
 
             {/* Payments Table */}
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="rounded-xl bg-[rgba(255,255,255,0.02)] overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3">Type</th>
-                      <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3">From / To</th>
-                      <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3">Amount</th>
-                      <th className="text-center text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3">Status</th>
-                      <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3">Date</th>
+                    <tr className="border-b border-[rgba(255,255,255,0.05)]">
+                      <th className="text-left text-xs font-medium text-[#A7B0C8] uppercase tracking-wider px-4 py-3">Type</th>
+                      <th className="text-left text-xs font-medium text-[#A7B0C8] uppercase tracking-wider px-4 py-3">From / To</th>
+                      <th className="text-right text-xs font-medium text-[#A7B0C8] uppercase tracking-wider px-4 py-3">Amount</th>
+                      <th className="text-center text-xs font-medium text-[#A7B0C8] uppercase tracking-wider px-4 py-3">Status</th>
+                      <th className="text-right text-xs font-medium text-[#A7B0C8] uppercase tracking-wider px-4 py-3">Date</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody className="divide-y divide-[rgba(255,255,255,0.05)]">
                     {filteredPayments.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                        <td colSpan={5} className="px-4 py-12 text-center text-sm text-[#A7B0C8]">
                           {isPending ? "Loading..." : "No payments yet."}
                         </td>
                       </tr>
@@ -212,7 +212,7 @@ export default function PaymentsPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-sm font-mono">{payment.from || payment.to}</span>
+                            <span className="text-sm font-mono text-[#F4F6FF]">{payment.from || payment.to}</span>
                           </td>
                           <td className="px-4 py-3 text-right">
                             <span className={cn(
@@ -238,8 +238,8 @@ export default function PaymentsPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div>
-                              <p className="text-sm">{payment.time}</p>
-                              <p className="text-xs text-muted-foreground">{payment.date}</p>
+                              <p className="text-sm text-[#F4F6FF]">{payment.time}</p>
+                              <p className="text-xs text-[#A7B0C8]">{payment.date}</p>
                             </div>
                           </td>
                         </motion.tr>

@@ -137,8 +137,8 @@ export default function SwapPage() {
               <ArrowLeftRight className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight">Swap</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="font-heading text-3xl lg:text-4xl font-semibold tracking-tight text-[#F4F6FF]">Swap</h1>
+              <p className="text-base text-[#A7B0C8] mt-1">
                 Swap tokens via DeepBook V3 — powered by Sui CLOB
               </p>
             </div>
@@ -184,8 +184,8 @@ export default function SwapPage() {
                     className={cn(
                       "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 whitespace-nowrap border",
                       selectedPool.key === pool.key
-                        ? "bg-primary/10 border-primary/30 text-primary"
-                        : "bg-card border-border text-muted-foreground hover:border-primary/20 hover:text-foreground"
+                        ? "bg-[rgba(179,71,255,0.1)] border-[#B347FF]/30 text-[#B347FF]"
+                        : "bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.05)] text-[#A7B0C8] hover:border-[#B347FF]/20 hover:text-[#F4F6FF]"
                     )}
                   >
                     <Coins className="w-4 h-4" />
@@ -196,18 +196,18 @@ export default function SwapPage() {
             </div>
 
             {/* ── Swap Card ──────────────────────────────────────────── */}
-            <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+            <div className="rounded-2xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] shadow-sm overflow-hidden">
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-border">
+              <div className="flex items-center justify-between p-4 border-b border-[rgba(255,255,255,0.05)]">
                 <div className="flex items-center gap-2">
-                  <ArrowLeftRight className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Swap</span>
+                  <ArrowLeftRight className="w-4 h-4 text-[#B347FF]" />
+                  <span className="font-heading text-lg font-medium text-[#F4F6FF]">Swap</span>
                 </div>
                 <button
                   onClick={() => setShowSettings(!showSettings)}
-                  className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors"
                 >
-                  <Settings2 className="w-4 h-4 text-muted-foreground" />
+                  <Settings2 className="w-4 h-4 text-[#A7B0C8]" />
                 </button>
               </div>
 
@@ -218,11 +218,11 @@ export default function SwapPage() {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden border-b border-border"
+                    className="overflow-hidden border-b border-[rgba(255,255,255,0.05)]"
                   >
                     <div className="p-4 space-y-3">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs text-muted-foreground">Slippage Tolerance</label>
+                        <label className="text-xs text-[#A7B0C8]">Slippage Tolerance</label>
                         <div className="flex items-center gap-1">
                           {[0.1, 0.5, 1.0].map((val) => (
                             <button
@@ -231,8 +231,8 @@ export default function SwapPage() {
                               className={cn(
                                 "px-2 py-1 text-xs rounded-lg transition-colors",
                                 slippage === val
-                                  ? "bg-primary/10 text-primary"
-                                  : "bg-accent text-muted-foreground hover:text-foreground"
+                                  ? "bg-[rgba(179,71,255,0.1)] text-[#B347FF]"
+                                  : "bg-[rgba(255,255,255,0.03)] text-[#A7B0C8] hover:text-[#F4F6FF]"
                               )}
                             >
                               {val}%
@@ -257,9 +257,9 @@ export default function SwapPage() {
               {/* Swap form */}
               <div className="p-4 space-y-2">
                 {/* From (you pay) */}
-                <div className="rounded-xl bg-accent/30 p-4">
+                <div className="rounded-xl bg-[rgba(255,255,255,0.03)] p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs text-muted-foreground">You pay</label>
+                    <label className="text-xs text-[#A7B0C8]">You pay</label>
                   </div>
                   <div className="flex items-center gap-3">
                     <Input
@@ -267,11 +267,11 @@ export default function SwapPage() {
                       placeholder="0.0"
                       value={inputAmount}
                       onChange={(e) => setInputAmount(e.target.value)}
-                      className="text-2xl font-semibold border-0 bg-transparent p-0 h-auto focus-visible:ring-0"
+                      className="font-heading text-3xl font-semibold border-0 bg-transparent p-0 h-auto focus-visible:ring-0 text-[#F4F6FF]"
                       min={0}
                     />
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border border-border text-sm font-medium whitespace-nowrap">
-                      <Coins className="w-4 h-4 text-primary" />
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.05)] text-sm font-medium whitespace-nowrap text-[#F4F6FF]">
+                      <Coins className="w-4 h-4 text-[#B347FF]" />
                       {fromLabel}
                     </div>
                   </div>
@@ -279,15 +279,15 @@ export default function SwapPage() {
 
                 {/* Direction indicator */}
                 <div className="flex justify-center -my-3 relative z-10">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-card bg-accent">
-                    <ArrowDownUp className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-[#0B0C10] bg-[rgba(255,255,255,0.05)]">
+                    <ArrowDownUp className="w-4 h-4 text-[#A7B0C8]" />
                   </div>
                 </div>
 
                 {/* To (you receive) */}
-                <div className="rounded-xl bg-accent/30 p-4">
+                <div className="rounded-xl bg-[rgba(255,255,255,0.03)] p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs text-muted-foreground">You receive</label>
+                    <label className="text-xs text-[#A7B0C8]">You receive</label>
                     {inputAmount && (quoteLoading || estimatedOutput !== null) && (
                       <span className="text-xs">
                         {quoteLoading ? (
@@ -303,30 +303,30 @@ export default function SwapPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="flex-1 text-2xl font-semibold">
+                    <span className="flex-1 font-heading text-3xl font-semibold">
                       {!inputAmount ? (
-                        <span className="text-muted-foreground/40">0.0</span>
+                        <span className="text-[#A7B0C8]/40">0.0</span>
                       ) : quoteLoading ? (
                         <span className="text-muted-foreground/40">~</span>
                       ) : estimatedOutput && estimatedOutput > 0n ? (
-                        <span className="text-foreground">
+                        <span className="text-[#F4F6FF]">
                           {formatAmount(estimatedOutput, selectedPool.decimals)}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground/40">
+                        <span className="text-[#A7B0C8]/40">
                           {address ? "Simulating…" : "Connect wallet"}
                         </span>
                       )}
                     </span>
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border border-border text-sm font-medium whitespace-nowrap">
-                      <Coins className="w-4 h-4 text-purple-500" />
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.05)] text-sm font-medium whitespace-nowrap text-[#F4F6FF]">
+                      <Coins className="w-4 h-4 text-[#B347FF]" />
                       {toLabel}
                     </div>
                   </div>
                 </div>
 
                 {/* Pool info */}
-                <div className="flex items-center justify-between px-1 py-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between px-1 py-2 text-xs text-[#A7B0C8]">
                   <div className="flex items-center gap-1">
                     <Info className="w-3 h-3" />
                     <span>Via DeepBook V3 — {selectedPool.label}</span>
@@ -338,7 +338,7 @@ export default function SwapPage() {
               {/* Actions */}
               <div className="p-4 pt-0 space-y-3">
                 <Button
-                  className="w-full h-12 text-base font-semibold gap-2"
+                  className="w-full h-12 text-base font-semibold gap-2 bg-[#B347FF] text-[#0B0C10] hover:scale-105 transition-all duration-300 rounded-full"
                   onClick={handleSwap}
                   disabled={
                     loading ||
@@ -397,29 +397,29 @@ export default function SwapPage() {
             </div>
 
             {/* Pool Info */}
-            <div className="mt-4 rounded-xl border border-border bg-card p-4">
+            <div className="mt-4 rounded-xl bg-[rgba(255,255,255,0.02)] p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Info className="w-4 h-4 text-muted-foreground" />
-                <h3 className="text-sm font-medium">Pool Info</h3>
+                <Info className="w-4 h-4 text-[#A7B0C8]" />
+                <h3 className="font-heading text-lg font-medium text-[#F4F6FF]">Pool Info</h3>
               </div>
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="flex items-center justify-between p-2 rounded-lg bg-accent/30">
-                  <span className="text-muted-foreground">Pool</span>
-                  <span className="font-medium">{selectedPool.label}</span>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[rgba(255,255,255,0.03)]">
+                  <span className="text-[#A7B0C8]">Pool</span>
+                  <span className="font-medium text-[#F4F6FF]">{selectedPool.label}</span>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-accent/30">
-                  <span className="text-muted-foreground">Route</span>
-                  <span className="font-medium">sell {fromLabel} → buy {toLabel}</span>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[rgba(255,255,255,0.03)]">
+                  <span className="text-[#A7B0C8]">Route</span>
+                  <span className="font-medium text-[#F4F6FF]">sell {fromLabel} → buy {toLabel}</span>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-accent/30">
-                  <span className="text-muted-foreground">Wallet</span>
-                  <span className="font-medium font-mono">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[rgba(255,255,255,0.03)]">
+                  <span className="text-[#A7B0C8]">Wallet</span>
+                  <span className="font-medium font-mono text-[#F4F6FF]">
                     {address?.slice(0, 6)}...{address?.slice(-4)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-accent/30">
-                  <span className="text-muted-foreground">Protocol</span>
-                  <span className="font-medium">DeepBook V3</span>
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[rgba(255,255,255,0.03)]">
+                  <span className="text-[#A7B0C8]">Protocol</span>
+                  <span className="font-medium text-[#F4F6FF]">DeepBook V3</span>
                 </div>
               </div>
             </div>
