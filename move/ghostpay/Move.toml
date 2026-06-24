@@ -1,0 +1,11 @@
+[package]
+name = "ghostpay"
+version = "0.1.0"
+edition = "2024.beta"
+published-at = "0x0f78ba6b1f89d2d707cb2806abba2c1a7dd33f5772614db8020d4892de56e014"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+ghostpay = "0x0f78ba6b1f89d2d707cb2806abba2c1a7dd33f5772614db8020d4892de56e014"
