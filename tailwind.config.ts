@@ -141,6 +141,10 @@ const config = {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-12px)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -154,6 +158,7 @@ const config = {
         "spin-slow": "spin-slow 8s linear infinite",
         "pulse-soft": "pulse-soft 2s ease-in-out infinite",
         shimmer: "shimmer 1.5s ease-in-out infinite",
+        float: "float 6s ease-in-out infinite",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],

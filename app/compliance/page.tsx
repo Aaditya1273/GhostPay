@@ -40,20 +40,9 @@ const isPackageDeployed = !!(
   clientConfig.PACKAGE_ID && clientConfig.PACKAGE_ID !== "0x0"
 );
 
-const mockAccessLogs = [
-  { action: "View-key shared", entity: "[email protected]", date: "Today", status: "active" as const, type: "share" as const },
-  { action: "Data accessed", entity: "Compliance Audit", date: "Yesterday", status: "completed" as const, type: "access" as const },
-  { action: "View-key revoked", entity: "[email protected]", date: "3 days ago", status: "completed" as const, type: "revoke" as const },
-  { action: "View-key generated", entity: "GhostPay System", date: "1 week ago", status: "completed" as const, type: "generate" as const },
-];
-
-const mockActiveKeys = [
-  { name: "Compliance Audit", key: "vk_0x1a2b...3c4d", created: "2026-06-21", expiry: "2026-12-21", status: "active" as const },
-  { name: "Financial Review", key: "vk_0x5e6f...7g8h", created: "2026-06-15", expiry: "2026-09-15", status: "active" as const },
-];
 
 export default function CompliancePage() {
-  const { isConnected, redirectToAuthUrl, address } = useCustomWallet();
+  const { isUsingEnoki, redirectToAuthUrl, address } = useCustomWallet();
   const suiClient = useSuiClient();
   const { viewKeys } = useViewKeys();
   const { logs: accessLogs } = useAccessLogs();
@@ -218,27 +207,23 @@ export default function CompliancePage() {
     }
   };
 
-  const displayKeys = isPackageDeployed
-    ? viewKeys.map((k) => ({
-        id: k.id,
-        name: k.label,
-        key: k.viewerShort,
-        viewer: k.viewer,
-        created: new Date(k.createdAt).toISOString().split("T")[0],
-        expiry: k.expiryStr,
-        status: (k.active ? "active" : "revoked") as "active" | "revoked",
-      }))
-    : mockActiveKeys.map((k, i) => ({ ...k, id: `mock-${i}`, viewer: k.key }));
+  const displayKeys = viewKeys.map((k) => ({
+    id: k.id,
+    name: k.label,
+    key: k.viewerShort,
+    viewer: k.viewer,
+    created: new Date(k.createdAt).toISOString().split("T")[0],
+    expiry: k.expiryStr,
+    status: (k.active ? "active" : "revoked") as "active" | "revoked",
+  }));
 
-  const displayLogs = isPackageDeployed
-    ? accessLogs.map((l) => ({
-        action: l.purpose,
-        entity: l.viewer.slice(0, 10) + "...",
-        date: l.dateStr,
-        status: "completed" as const,
-        type: "access" as const,
-      }))
-    : mockAccessLogs;
+  const displayLogs = accessLogs.map((l) => ({
+    action: l.purpose,
+    entity: l.viewer.slice(0, 10) + "...",
+    date: l.dateStr,
+    status: "completed" as const,
+    type: "access" as const,
+  }));
 
   return (
     <LayoutShell>
@@ -253,23 +238,21 @@ export default function CompliancePage() {
               <Shield className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl lg:text-3xl font-semibold tracking-tight">Compliance Portal</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="font-heading text-3xl lg:text-4xl font-semibold tracking-tight text-[#F4F6FF]">Compliance Portal</h1>
+              <p className="text-base text-[#A7B0C8] mt-1">
                 Selective disclosure via view-keys + SEAL — audit-ready, privacy-preserving
               </p>
             </div>
           </div>
         </motion.div>
 
-        {!isConnected ? (
+        {!isUsingEnoki ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center justify-center py-24 gap-6"
           >
-            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10">
-              <Ghost className="w-8 h-8 text-primary" />
-            </div>
+            <img src="/images/ghost-mascot.png" alt="GhostPay Mascot" className="w-24 h-24 object-contain animate-float" />
             <div className="text-center max-w-md">
               <h2 className="text-xl font-semibold mb-2">Compliance Requires Authentication</h2>
               <p className="text-muted-foreground mb-4">
@@ -289,10 +272,10 @@ export default function CompliancePage() {
             {/* Overview Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: "Active View-Keys", value: isPackageDeployed ? String(viewKeys.filter(k => k.active).length) : "2", icon: Eye, color: "text-success" },
-                { label: "Access Events", value: isPackageDeployed ? String(accessLogs.length) : "47", icon: Clock, color: "text-primary" },
-                { label: "Data Subjects", value: isPackageDeployed ? String(new Set(accessLogs.map(l => l.viewer)).size) : "3", icon: Users, color: "text-purple-500" },
-                { label: "Compliance Score", value: "98%", icon: Shield, color: "text-emerald-500" },
+                { label: "Active View-Keys", value: String(viewKeys.filter(k => k.active).length), icon: Eye, color: "text-success" },
+                { label: "Access Events", value: String(accessLogs.length), icon: Clock, color: "text-primary" },
+                { label: "Data Subjects", value: String(new Set(accessLogs.map(l => l.viewer)).size), icon: Users, color: "text-purple-500" },
+                { label: "Compliance Score", value: viewKeys.length > 0 ? "100%" : "N/A", icon: Shield, color: "text-emerald-500" },
               ].map((stat, i) => {
                 const Icon = stat.icon;
                 return (
@@ -301,7 +284,7 @@ export default function CompliancePage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.1 }}
-                    className="rounded-xl border border-border bg-card p-4"
+                    className="rounded-2xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] p-4"
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <Icon className={cn("w-4 h-4", stat.color)} />
@@ -315,7 +298,7 @@ export default function CompliancePage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Active View-Keys */}
-              <div className="rounded-xl border border-border bg-card">
+              <div className="rounded-2xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)]">
                 <div className="flex items-center justify-between p-5 border-b border-border">
                   <div className="flex items-center gap-2">
                     <Key className="w-4 h-4 text-primary" />
@@ -331,7 +314,7 @@ export default function CompliancePage() {
                     Generate New
                   </Button>
                 </div>
-                <div className="divide-y divide-border">
+                <div className="divide-y divide-[rgba(255,255,255,0.05)]">
                   {displayKeys.length === 0 ? (
                     <div className="p-8 text-center text-sm text-muted-foreground">
                       No view-keys yet. Generate one to share access via SEAL.
@@ -391,7 +374,7 @@ export default function CompliancePage() {
               </div>
 
               {/* Access Logs */}
-              <div className="rounded-xl border border-border bg-card">
+              <div className="rounded-2xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)]">
                 <div className="flex items-center justify-between p-5 border-b border-border">
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
@@ -399,7 +382,7 @@ export default function CompliancePage() {
                   </div>
                   <span className="text-xs text-muted-foreground">Last 7 days</span>
                 </div>
-                <div className="divide-y divide-border">
+                <div className="divide-y divide-[rgba(255,255,255,0.05)]">
                   {displayLogs.length === 0 ? (
                     <div className="p-8 text-center text-sm text-muted-foreground">
                       No access events yet.
@@ -443,7 +426,7 @@ export default function CompliancePage() {
 
             {/* Memories with SEAL Decrypt */}
             {memories.length > 0 && (
-              <div className="rounded-xl border border-border bg-card">
+              <div className="rounded-2xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)]">
                 <div className="flex items-center justify-between p-5 border-b border-border">
                   <div className="flex items-center gap-2">
                     <Lock className="w-4 h-4 text-primary" />
@@ -453,7 +436,7 @@ export default function CompliancePage() {
                     {memories.filter(m => m.visibility === "private").length} encrypted
                   </span>
                 </div>
-                <div className="divide-y divide-border">
+                <div className="divide-y divide-[rgba(255,255,255,0.05)]">
                   {memories.filter(m => m.visibility === "private").length === 0 ? (
                     <div className="p-8 text-center text-sm text-muted-foreground">
                       No encrypted memories found.

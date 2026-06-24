@@ -12,7 +12,6 @@ import {
   Shield,
   ArrowUpRight,
   ArrowDownRight,
-  Ghost,
   Sparkles,
   Clock,
 } from "lucide-react";
@@ -36,7 +35,7 @@ const isPackageDeployed =
   !!(clientConfig.PACKAGE_ID && clientConfig.PACKAGE_ID !== "0x0");
 
 export default function DashboardPage() {
-  const { isConnected, address } = useCustomWallet();
+  const { isUsingEnoki, address } = useCustomWallet();
   const { fields: agent, hasAgent } = useAgent();
   const { payments } = usePayments();
 
@@ -49,13 +48,12 @@ export default function DashboardPage() {
     .filter((p) => p.recipient === address)
     .reduce((s, p) => s + p.amount, 0);
 
-  // Stats derived from chain data (or mock defaults when not deployed)
   const stats = [
     {
       label: "Agent Balance",
-      value: isPackageDeployed && hasAgent ? "Active" : "1,234.56",
-      unit: isPackageDeployed && hasAgent ? agent?.display_name || "GhostPay" : "USDC",
-      change: isPackageDeployed && hasAgent ? "Online" : "+12.5%",
+      value: hasAgent ? "Active" : "0",
+      unit: hasAgent ? agent?.display_name || "GhostPay" : "USDC",
+      change: hasAgent ? "Online" : "Offline",
       positive: true,
       icon: Wallet,
       color: "from-blue-500/20 to-blue-500/5",
@@ -63,9 +61,9 @@ export default function DashboardPage() {
     },
     {
       label: "Transactions",
-      value: isPackageDeployed ? String(txnCount) : "47",
+      value: String(txnCount),
       unit: "total",
-      change: isPackageDeployed ? `${txnCount} total` : "+8 this month",
+      change: `${txnCount} total`,
       positive: true,
       icon: Send,
       color: "from-emerald-500/20 to-emerald-500/5",
@@ -75,7 +73,7 @@ export default function DashboardPage() {
       label: "Memory Blobs",
       value: "—",
       unit: "encrypted",
-      change: "2.4 GB stored",
+      change: "Encrypted on Walrus",
       positive: true,
       icon: Database,
       color: "from-purple-500/20 to-purple-500/5",
@@ -93,24 +91,16 @@ export default function DashboardPage() {
     },
   ];
 
-  // Activity feed from chain payments (or mock data when not deployed)
-  const recentActivity = isPackageDeployed
-    ? recentPayments.map((p) => ({
-        type: p.recipient === address ? ("received" as const) : ("sent" as const),
-        label: p.memo || (p.recipient === address ? "Payment received" : "Agent payout"),
-        amount:
-          p.recipient === address
-            ? `+${p.amount} ${p.currency}`
-            : `-${p.amount} ${p.currency}`,
-        time: p.dateStr,
-        status: p.status,
-      }))
-    : [
-        { type: "received" as const, label: "Payment received", amount: "+500 USDC", time: "2 min ago", status: "completed" },
-        { type: "sent" as const, label: "Agent payout", amount: "-50 USDC", time: "1 hour ago", status: "completed" },
-        { type: "vault" as const, label: "Memory stored", amount: "Encrypted blob", time: "3 hours ago", status: "completed" },
-        { type: "compliance" as const, label: "View-key shared", amount: "Audit access", time: "1 day ago", status: "completed" },
-      ];
+  const recentActivity = recentPayments.map((p) => ({
+    type: p.recipient === address ? ("received" as const) : ("sent" as const),
+    label: p.memo || (p.recipient === address ? "Payment received" : "Agent payout"),
+    amount:
+      p.recipient === address
+        ? `+${p.amount} ${p.currency}`
+        : `-${p.amount} ${p.currency}`,
+    time: p.dateStr,
+    status: p.status,
+  }));
 
   return (
     <LayoutShell>
@@ -122,9 +112,7 @@ export default function DashboardPage() {
           className="mb-8"
         >
           <div className="flex items-center gap-3 mb-2">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
-              <Ghost className="w-5 h-5 text-primary" />
-            </div>
+            <img src="/images/ghost-mascot.png" alt="GhostPay Mascot" className="w-12 h-12 object-contain animate-float" />
             <div>
               <h1 className="font-heading text-3xl lg:text-4xl font-semibold tracking-tight text-[#F4F6FF]">
                 {isPackageDeployed && hasAgent
@@ -140,19 +128,18 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
-        {!isConnected ? (
+        {!isUsingEnoki ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center justify-center py-24 gap-6"
           >
-            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10">
-              <Ghost className="w-8 h-8 text-primary" />
-            </div>
+            <img src="/images/ghost-mascot.png" alt="GhostPay Mascot" className="w-24 h-24 object-contain animate-float" />
             <div className="text-center max-w-md">
               <h2 className="text-xl font-semibold mb-2">Your Invisible Bank Awaits</h2>
               <p className="text-muted-foreground">
-                Sign in to activate your AI agent wallet. No seed phrases, no gas fees — just seamless banking.
+                Sign in to activate your AI agent wallet. No seed phrases, no gas fees 
+                just seamless banking.
               </p>
             </div>
           </motion.div>
@@ -248,9 +235,9 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between p-5">
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-muted-foreground" />
-                      <h3 className="font-heading text-lg font-medium text-[#F4F6FF]">{isPackageDeployed ? "Recent Payments" : "Recent Activity"}</h3>
+                      <h3 className="font-heading text-lg font-medium text-[#F4F6FF]">Recent Payments</h3>
                     </div>
-                    <span className="text-xs text-[#A7B0C8]">{isPackageDeployed ? `${recentActivity.length} transactions` : "Last 24 hours"}</span>
+                    <span className="text-xs text-[#A7B0C8]">{recentActivity.length} transactions</span>
                   </div>
                   <div className="divide-y divide-[rgba(255,255,255,0.05)]">
                     {recentActivity.length === 0 ? (

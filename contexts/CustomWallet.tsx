@@ -102,6 +102,7 @@ export default function CustomWalletProvider({children}: {children: React.ReactN
           disconnect();
         }
         sessionStorage.clear();
+        window.location.href = "/";
       },
     };
   }, [

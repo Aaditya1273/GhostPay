@@ -28,7 +28,7 @@ import {
 import { useSuiClient } from "@mysten/dapp-kit";
 
 export default function SwapPage() {
-  const { isConnected, redirectToAuthUrl, address } = useCustomWallet();
+  const { isUsingEnoki, redirectToAuthUrl, address } = useCustomWallet();
   const suiClient = useSuiClient();
   const { loading, error, executeSwap } = useDeepBook();
 
@@ -145,15 +145,13 @@ export default function SwapPage() {
           </div>
         </motion.div>
 
-        {!isConnected ? (
+        {!isUsingEnoki ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center justify-center py-24 gap-6"
           >
-            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10">
-              <Ghost className="w-8 h-8 text-primary" />
-            </div>
+            <img src="/images/ghost-mascot.png" alt="GhostPay Mascot" className="w-24 h-24 object-contain animate-float" />
             <div className="text-center max-w-md">
               <h2 className="text-xl font-semibold mb-2">Swap Requires a Wallet</h2>
               <p className="text-muted-foreground mb-4">

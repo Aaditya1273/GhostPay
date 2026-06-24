@@ -27,33 +27,22 @@ import clientConfig from "@/config/clientConfig";
 const isPackageDeployed =
   !!(clientConfig.PACKAGE_ID && clientConfig.PACKAGE_ID !== "0x0");
 
-const mockPayments = [
-  { id: "1", type: "received" as const, from: "0x1a2b...3c4d", amount: "+500.00", currency: "USDC", status: "completed" as const, date: "2026-06-21", time: "2 min ago" },
-  { id: "2", type: "sent" as const, to: "Agent #42", amount: "-50.00", currency: "USDC", status: "completed" as const, date: "2026-06-21", time: "1 hour ago" },
-  { id: "3", type: "received" as const, from: "0x5e6f...7g8h", amount: "+1,200.00", currency: "USDC", status: "completed" as const, date: "2026-06-20", time: "Yesterday" },
-  { id: "4", type: "sent" as const, to: "Freelancer", amount: "-250.00", currency: "USDC", status: "pending" as const, date: "2026-06-20", time: "Yesterday" },
-  { id: "5", type: "received" as const, from: "0x9i0j...1k2l", amount: "+75.00", currency: "USDC", status: "completed" as const, date: "2026-06-19", time: "2 days ago" },
-  { id: "6", type: "sent" as const, to: "Service Fee", amount: "-15.00", currency: "USDC", status: "failed" as const, date: "2026-06-18", time: "3 days ago" },
-];
-
 export default function PaymentsPage() {
-  const { isConnected, address, redirectToAuthUrl } = useCustomWallet();
+  const { isUsingEnoki, address, redirectToAuthUrl } = useCustomWallet();
   const { payments: chainPayments, isPending } = usePayments();
   const [searchQuery, setSearchQuery] = useState("");
 
-  const displayPayments = isPackageDeployed
-    ? chainPayments.map((p) => ({
-        id: p.id,
-        type: (p.recipient === address ? "received" : "sent") as "received" | "sent",
-        from: p.recipient === address ? p.recipient.slice(0, 10) + "..." : "",
-        to: p.recipient !== address ? p.recipient.slice(0, 10) + "..." : "",
-        amount: p.recipient === address ? `+${p.amount}` : `-${p.amount}`,
-        currency: p.currency,
-        status: p.status as "completed" | "pending" | "failed",
-        date: new Date(p.timestamp).toISOString().split("T")[0],
-        time: p.dateStr,
-      }))
-    : mockPayments;
+  const displayPayments = chainPayments.map((p) => ({
+    id: p.id,
+    type: (p.recipient === address ? "received" : "sent") as "received" | "sent",
+    from: p.recipient === address ? p.recipient.slice(0, 10) + "..." : "",
+    to: p.recipient !== address ? p.recipient.slice(0, 10) + "..." : "",
+    amount: p.recipient === address ? `+${p.amount}` : `-${p.amount}`,
+    currency: p.currency,
+    status: p.status as "completed" | "pending" | "failed",
+    date: new Date(p.timestamp).toISOString().split("T")[0],
+    time: p.dateStr,
+  }));
 
   const filteredPayments = displayPayments.filter((p: any) =>
     (p.from || p.to || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -86,7 +75,7 @@ export default function PaymentsPage() {
                 <p className="text-base text-[#A7B0C8] mt-1">Send and receive funds globally</p>
               </div>
             </div>
-            {isConnected && (
+            {isUsingEnoki && (
               <Button className="gap-2 hidden sm:flex">
                 <Send className="w-4 h-4" />
                 New Payment
@@ -95,15 +84,13 @@ export default function PaymentsPage() {
           </div>
         </motion.div>
 
-        {!isConnected ? (
+        {!isUsingEnoki ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center justify-center py-24 gap-6"
           >
-            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10">
-              <Ghost className="w-8 h-8 text-primary" />
-            </div>
+            <img src="/images/ghost-mascot.png" alt="GhostPay Mascot" className="w-24 h-24 object-contain animate-float" />
             <div className="text-center max-w-md">
               <h2 className="text-xl font-semibold mb-2">Payments Require a Wallet</h2>
               <p className="text-muted-foreground mb-4">
@@ -123,10 +110,10 @@ export default function PaymentsPage() {
             {/* Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: "Total Sent", value: isPackageDeployed ? totalSent.toFixed(2) : "315.00", unit: "USDC", icon: ArrowUpRight, color: "text-destructive" },
-                { label: "Total Received", value: isPackageDeployed ? totalReceived.toFixed(2) : "1,775.00", unit: "USDC", icon: ArrowDownRight, color: "text-success" },
-                { label: "Pending", value: isPackageDeployed ? String(pendingCount) : "1", unit: "transaction", icon: Loader2, color: "text-warning" },
-                { label: "This Month", value: isPackageDeployed ? String(chainPayments.length) : "8", unit: "transactions", icon: Clock, color: "text-primary" },
+                { label: "Total Sent", value: totalSent.toFixed(2), unit: "USDC", icon: ArrowUpRight, color: "text-destructive" },
+                { label: "Total Received", value: totalReceived.toFixed(2), unit: "USDC", icon: ArrowDownRight, color: "text-success" },
+                { label: "Pending", value: String(pendingCount), unit: "transaction", icon: Loader2, color: "text-warning" },
+                { label: "This Month", value: String(chainPayments.length), unit: "transactions", icon: Clock, color: "text-primary" },
               ].map((stat, i) => {
                 const Icon = stat.icon;
                 return (
@@ -151,7 +138,7 @@ export default function PaymentsPage() {
             {/* Search & Filter */}
             <div className="flex items-center gap-3">
               <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A7B0C8]" />
                 <Input
                   placeholder="Search transactions..."
                   value={searchQuery}
@@ -194,7 +181,7 @@ export default function PaymentsPage() {
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: i * 0.05 }}
-                          className="hover:bg-accent/30 transition-colors"
+                          className="hover:bg-[rgba(255,255,255,0.02)] transition-colors text-[#F4F6FF]"
                         >
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">

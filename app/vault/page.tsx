@@ -61,20 +61,8 @@ const uploadStepMessages: Record<UploadStep, string> = {
   error: "Upload failed",
 };
 
-const mockMemories: {
-  id: string; name: string; size: string; status: "encrypted" | "shared";
-  date: string; type: string; blobId?: string;
-}[] = [
-  { id: "1", name: "Payslip Q2 2026", size: "2.4 MB", status: "encrypted" as const, date: "Today", type: "payslip" as const },
-  { id: "2", name: "KYC Document", size: "1.1 MB", status: "encrypted" as const, date: "Yesterday", type: "kyc" as const },
-  { id: "3", name: "Agent Instructions", size: "0.3 MB", status: "encrypted" as const, date: "2 days ago", type: "config" as const },
-  { id: "4", name: "Transaction Receipt #47", size: "0.8 MB", status: "encrypted" as const, date: "3 days ago", type: "receipt" as const },
-  { id: "5", name: "Compliance Report", size: "4.2 MB", status: "shared" as const, date: "1 week ago", type: "report" as const },
-  { id: "6", name: "Settlement Proof", size: "1.5 MB", status: "encrypted" as const, date: "1 week ago", type: "proof" as const },
-];
-
 export default function VaultPage() {
-  const { isConnected, redirectToAuthUrl, address } = useCustomWallet();
+  const { isUsingEnoki, redirectToAuthUrl, address } = useCustomWallet();
   const { memories: chainMemories, isPending } = useMemories();
   const { agentId: agentObjectId } = useAgent();
   const { state: uploadState, upload, reset: resetUpload } = useWalrusUpload();
@@ -87,17 +75,15 @@ export default function VaultPage() {
   const [showDataTypePicker, setShowDataTypePicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const displayMemories = isPackageDeployed
-    ? chainMemories.map((m) => ({
-        id: m.id,
-        name: m.label || `${m.dataType.charAt(0).toUpperCase() + m.dataType.slice(1)} Memory`,
-        size: m.sizeStr,
-        status: (m.visibility === "private" ? "encrypted" : "shared") as "encrypted" | "shared",
-        date: m.dateStr,
-        type: m.dataType as any,
-        blobId: m.blobId,
-      }))
-    : mockMemories;
+  const displayMemories = chainMemories.map((m) => ({
+    id: m.id,
+    name: m.label || `${m.dataType.charAt(0).toUpperCase() + m.dataType.slice(1)} Memory`,
+    size: m.sizeStr,
+    status: (m.visibility === "private" ? "encrypted" : "shared") as "encrypted" | "shared",
+    date: m.dateStr,
+    type: m.dataType as any,
+    blobId: m.blobId,
+  }));
 
   const totalSizeMB = chainMemories.reduce((s, m) => s + m.dataSize, 0) / (1024 * 1024);
 
@@ -208,7 +194,7 @@ export default function VaultPage() {
                 </p>
               </div>
             </div>
-            {isConnected && (
+            {isUsingEnoki && (
               <Button
                 className="gap-2 hidden sm:flex bg-[#B347FF] text-[#0B0C10] rounded-full font-semibold hover:bg-[#A03FE6]"
                 onClick={() => setShowUploadModal(true)}
@@ -220,15 +206,13 @@ export default function VaultPage() {
           </div>
         </motion.div>
 
-        {!isConnected ? (
+        {!isUsingEnoki ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center justify-center py-24 gap-6"
           >
-            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10">
-              <Ghost className="w-8 h-8 text-primary" />
-            </div>
+            <img src="/images/ghost-mascot.png" alt="GhostPay Mascot" className="w-24 h-24 object-contain animate-float" />
             <div className="text-center max-w-md">
               <h2 className="text-xl font-semibold mb-2">Memory Vault is Locked</h2>
               <p className="text-muted-foreground mb-4">
