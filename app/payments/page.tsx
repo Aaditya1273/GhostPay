@@ -1,9 +1,14 @@
 "use client";
 
 import { useCustomWallet } from "@/contexts/CustomWallet";
+import { useAgent } from "@/hooks/useAgentQuery";
 import { usePayments } from "@/hooks/usePaymentQuery";
+import { usePaymentTransaction } from "@/hooks/usePaymentTransaction";
+import { useBalances } from "@/hooks/useBalances";
 import LayoutShell from "@/components/LayoutShell";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useSuiClient } from "@mysten/dapp-kit";
+import { DBUSDC_COIN, SUI_COIN } from "@/lib/constants";
 import {
   Send,
   ArrowUpRight,
@@ -16,11 +21,14 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  X,
+  ChevronDown,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import clientConfig from "@/config/clientConfig";
 
@@ -29,8 +37,87 @@ const isPackageDeployed =
 
 export default function PaymentsPage() {
   const { isUsingEnoki, address, redirectToAuthUrl } = useCustomWallet();
+  const { fields: agent, hasAgent, agentId } = useAgent();
   const { payments: chainPayments, isPending } = usePayments();
+  const { sui: suiBalance, usdc: usdcBalance, refetch: refetchBalances } = useBalances();
+  const suiClient = useSuiClient();
+  const { transferTokens } = usePaymentTransaction();
+
+  // ── Send Modal state ────────────────────────────────────────────────
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [sendRecipient, setSendRecipient] = useState("");
+  const [sendAmount, setSendAmount] = useState("");
+  const [sendMemo, setSendMemo] = useState("");
+  const [sendCurrency, setSendCurrency] = useState<"SUI" | "USDC">("SUI");
+  const [sending, setSending] = useState(false);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
+
+  // ── Send handler ─────────────────────────────────────────────────────
+  const handleSend = useCallback(async () => {
+    const recipient = sendRecipient.trim();
+    const amount = parseFloat(sendAmount);
+    const memo = sendMemo.trim();
+
+    if (!recipient || !recipient.startsWith("0x") || recipient.length < 40) {
+      toast.error("Enter a valid Sui address");
+      return;
+    }
+    if (!amount || amount <= 0 || isNaN(amount)) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    if (!agentId) {
+      toast.error("No agent found. Create one on the dashboard first.");
+      return;
+    }
+
+    setSending(true);
+    try {
+      const coinType = sendCurrency === "SUI" ? SUI_COIN : DBUSDC_COIN;
+
+      let coinObjectId: string | undefined;
+      if (sendCurrency === "USDC") {
+        const coins = await suiClient.getCoins({
+          owner: address!,
+          coinType: DBUSDC_COIN,
+        });
+        if (coins.data.length === 0) {
+          throw new Error("No USDC coins found in this wallet");
+        }
+        coinObjectId = coins.data[0].coinObjectId;
+      }
+
+      const result = await transferTokens(
+        agentId,
+        recipient,
+        amount,
+        sendCurrency,
+        memo || `Payment to ${recipient.slice(0, 8)}`,
+        coinType,
+        coinObjectId
+      );
+
+      const status = result.effects?.status?.status;
+      if (status === "failure") {
+        throw new Error(result.effects?.status?.error || "Transaction failed");
+      }
+
+      toast.success(`Sent ${amount} ${sendCurrency}`);
+      setShowSendModal(false);
+      setSendRecipient("");
+      setSendAmount("");
+      setSendMemo("");
+      setSendCurrency("SUI");
+      refetchBalances();
+    } catch (err: any) {
+      const msg = err?.message || "Failed to send payment";
+      toast.error(msg);
+    } finally {
+      setSending(false);
+    }
+  }, [sendRecipient, sendAmount, sendMemo, sendCurrency, agentId, transferTokens, address, suiClient, refetchBalances]);
 
   const displayPayments = chainPayments.map((p) => ({
     id: p.id,
@@ -76,7 +163,7 @@ export default function PaymentsPage() {
               </div>
             </div>
             {isUsingEnoki && (
-              <Button className="gap-2 hidden sm:flex">
+              <Button className="gap-2 hidden sm:flex" onClick={() => setShowSendModal(true)}>
                 <Send className="w-4 h-4" />
                 New Payment
               </Button>
@@ -146,10 +233,10 @@ export default function PaymentsPage() {
                   className="pl-9"
                 />
               </div>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" onClick={() => toast.info(searchQuery ? "Filtered by search query" : "No filters applied")}>
                 <Filter className="w-4 h-4" />
               </Button>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" onClick={() => toast.info("Export coming soon — feature in active development")}>
                 <Download className="w-4 h-4" />
               </Button>
             </div>
@@ -239,6 +326,168 @@ export default function PaymentsPage() {
           </motion.div>
         )}
       </div>
+      {/* ── Send Payment Modal ──────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSendModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={(e) => e.target === e.currentTarget && !sending && setShowSendModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-5 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary/10">
+                    <Send className="w-4.5 h-4.5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold">New Payment</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Send USDC or SUI from your agent wallet
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => !sending && setShowSendModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-accent transition-colors"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 space-y-5">
+                {/* Recipient */}
+                <div>
+                  <Label htmlFor="pay-recipient" className="text-xs text-muted-foreground mb-2 block">
+                    Recipient Address <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="pay-recipient"
+                    placeholder="0x..."
+                    value={sendRecipient}
+                    onChange={(e) => setSendRecipient(e.target.value)}
+                    className="h-9 text-sm font-mono"
+                    disabled={sending}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+                  />
+                </div>
+
+                {/* Amount + Currency */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <Label htmlFor="pay-amount" className="text-xs text-muted-foreground mb-2 block">
+                      Amount <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="pay-amount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={sendAmount}
+                      onChange={(e) => setSendAmount(e.target.value)}
+                      className="h-9 text-sm"
+                      disabled={sending}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">Currency</Label>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowCurrencyPicker(!showCurrencyPicker)}
+                        className="flex items-center justify-between w-full h-9 px-3 rounded-lg border border-input bg-background text-sm hover:bg-accent/30 transition-colors"
+                        disabled={sending}
+                      >
+                        <span>{sendCurrency}</span>
+                        <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", showCurrencyPicker && "rotate-180")} />
+                      </button>
+                      <AnimatePresence>
+                        {showCurrencyPicker && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -8 }}
+                            className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-card shadow-lg overflow-hidden"
+                          >
+                            {["SUI", "USDC"].map((cur) => (
+                              <button
+                                key={cur}
+                                onClick={() => { setSendCurrency(cur as "SUI" | "USDC"); setShowCurrencyPicker(false); }}
+                                className={cn("flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent transition-colors text-left", sendCurrency === cur && "bg-accent")}
+                              >
+                                {cur}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Memo */}
+                <div>
+                  <Label htmlFor="pay-memo" className="text-xs text-muted-foreground mb-2 block">Memo</Label>
+                  <Input
+                    id="pay-memo"
+                    placeholder="e.g. Payment for services"
+                    value={sendMemo}
+                    onChange={(e) => setSendMemo(e.target.value)}
+                    className="h-9 text-sm"
+                    disabled={sending}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+                  />
+                </div>
+
+                {/* Summary */}
+                {sendRecipient && sendAmount && (
+                  <div className="p-3 rounded-lg bg-accent/30 text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Sending</span>
+                      <span className="font-medium">{sendAmount} {sendCurrency}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">To</span>
+                      <span className="font-mono">{sendRecipient.slice(0, 8)}...{sendRecipient.slice(-4)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Gas</span>
+                      <span className="text-success">Sponsored</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Balance</span>
+                      <span>{sendCurrency === "SUI" ? `${suiBalance.toFixed(2)} SUI` : `${usdcBalance.toFixed(2)} USDC`}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 p-5 border-t border-border bg-muted/20">
+                <Button variant="outline" size="sm" onClick={() => setShowSendModal(false)} disabled={sending}>Cancel</Button>
+                <Button size="sm" className="gap-2" onClick={handleSend} disabled={!sendRecipient.trim() || !sendAmount || sending}>
+                  {sending ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                  ) : (
+                    <><Send className="w-4 h-4" /> Send {sendCurrency}</>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </LayoutShell>
   );
 }

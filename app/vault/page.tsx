@@ -247,22 +247,20 @@ export default function VaultPage() {
                     <h3 className="font-heading text-lg font-medium text-[#F4F6FF]">Storage Usage</h3>
                   </div>
                   <span className="text-xs text-[#A7B0C8]">
-                    {isPackageDeployed
-                      ? `${totalSizeMB.toFixed(1)} MB of 10 GB used`
-                      : "2.4 GB of 10 GB used"}
+                    {`${totalSizeMB.toFixed(1)} MB of 10 GB used`}
                   </span>
                 </div>
                 <div className="h-2 rounded-full bg-[rgba(255,255,255,0.05)] overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: isPackageDeployed ? `${Math.min(totalSizeMB / 100, 100)}%` : "24%" }}
+                    animate={{ width: `${Math.min(totalSizeMB / 100, 100)}%` }}
                     transition={{ duration: 1, ease: "easeOut" }}
                     className="h-full rounded-full bg-gradient-to-r from-[#B347FF] to-purple-500"
                   />
                 </div>
                 <div className="flex items-center justify-between mt-2 text-xs text-[#A7B0C8]">
-                  <span>{isPackageDeployed ? `${(totalSizeMB / 100).toFixed(1)}% used` : "24% used"}</span>
-                  <span>{isPackageDeployed ? `${(10000 - totalSizeMB).toFixed(1)} MB free` : "7.6 GB free"}</span>
+                  <span>{`${(totalSizeMB / 100).toFixed(1)}% used`}</span>
+                  <span>{`${(10000 - totalSizeMB).toFixed(1)} MB free`}</span>
                 </div>
               </div>
               <div className="rounded-xl bg-[rgba(255,255,255,0.02)] p-4 flex flex-col items-center justify-center">

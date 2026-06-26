@@ -1,10 +1,12 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import { useCustomWallet } from "@/contexts/CustomWallet";
 import { useAgent } from "@/hooks/useAgentQuery";
+import { useAgentTransaction } from "@/hooks/useAgentTransaction";
 import { usePayments } from "@/hooks/usePaymentQuery";
 import LayoutShell from "@/components/LayoutShell";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Wallet,
   Send,
@@ -14,9 +16,16 @@ import {
   ArrowDownRight,
   Sparkles,
   Clock,
+  Ghost,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import clientConfig from "@/config/clientConfig";
+import { toast } from "sonner";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -34,10 +43,51 @@ const itemVariants = {
 const isPackageDeployed =
   !!(clientConfig.PACKAGE_ID && clientConfig.PACKAGE_ID !== "0x0");
 
+/** Hash a string with SHA-256 and return hex digest. */
+async function sha256Hex(input: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(input);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export default function DashboardPage() {
-  const { isUsingEnoki, address } = useCustomWallet();
-  const { fields: agent, hasAgent } = useAgent();
+  const { isUsingEnoki, address, emailAddress } = useCustomWallet();
+  const { fields: agent, hasAgent, isPending: agentLoading } = useAgent();
+  const { createAgent } = useAgentTransaction();
   const { payments } = usePayments();
+
+  // ── Create Agent state ───────────────────────────────────────────────
+  const [agentName, setAgentName] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const handleCreateAgent = useCallback(async () => {
+    const name = (agentName || emailAddress?.split("@")[0] || "My Agent").trim();
+    if (!name) {
+      toast.error("Enter an agent name");
+      return;
+    }
+    setCreating(true);
+    try {
+      const emailHash = emailAddress ? await sha256Hex(emailAddress) : "";
+      const result = await createAgent(name, emailHash);
+      const status = result.effects?.status?.status;
+      if (status === "failure") {
+        throw new Error(result.effects?.status?.error || "Transaction failed");
+      }
+      toast.success(`Agent "${name}" created on-chain!`);
+      // The query auto-refreshes every 10 s via refetchInterval,
+      // so the dashboard will pick up the new Agent automatically.
+    } catch (err: any) {
+      const msg = err?.message || "Failed to create agent";
+      toast.error(msg);
+    } finally {
+      setCreating(false);
+    }
+  }, [agentName, emailAddress, createAgent]);
+
+  const showCreateAgent = isUsingEnoki && !hasAgent && !agentLoading && !creating;
 
   const recentPayments = payments.slice(0, 4);
   const txnCount = payments.length;
@@ -141,6 +191,87 @@ export default function DashboardPage() {
                 Sign in to activate your AI agent wallet. No seed phrases, no gas fees 
                 just seamless banking.
               </p>
+            </div>
+          </motion.div>
+        ) : creating ? (
+          /* ── Creating Agent (waiting for on-chain confirmation) ── */
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center justify-center py-24 gap-6"
+          >
+            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-[rgba(179,71,255,0.1)]">
+              <Loader2 className="w-8 h-8 animate-spin text-[#B347FF]" />
+            </div>
+            <div className="text-center max-w-md">
+              <h2 className="text-xl font-semibold mb-2 text-[#F4F6FF]">Creating Agent…</h2>
+              <p className="text-[#A7B0C8]">
+                Submitting transaction to Sui Testnet. This should confirm in a few seconds.
+              </p>
+            </div>
+          </motion.div>
+        ) : showCreateAgent ? (
+          /* ── Create Agent flow (no agent exists yet) ── */
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-lg mx-auto py-12"
+          >
+            <div className="text-center mb-8">
+              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-[rgba(179,71,255,0.1)] mx-auto mb-4">
+                <Ghost className="w-8 h-8 text-[#B347FF]" />
+              </div>
+              <h2 className="font-heading text-2xl font-semibold text-[#F4F6FF] mb-2">
+                Create Your Agent
+              </h2>
+              <p className="text-[#A7B0C8] text-sm">
+                Your invisible bank needs an agent. This creates an on-chain Agent object
+                that manages your payments, encrypted storage, and compliance.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] p-6 space-y-5">
+              <div>
+                <label className="text-xs text-[#A7B0C8] mb-2 block">
+                  Agent Name <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  placeholder={emailAddress?.split("@")[0] || "My Agent"}
+                  value={agentName}
+                  onChange={(e) => setAgentName(e.target.value)}
+                  className="h-10 text-sm bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.08)] text-[#F4F6FF]"
+                  onKeyDown={(e) => { if (e.key === "Enter") handleCreateAgent(); }}
+                />
+              </div>
+
+              <Button
+                className="w-full h-12 text-base font-semibold gap-2 bg-[#B347FF] text-[#0B0C10] hover:scale-105 transition-all duration-300 rounded-full"
+                onClick={handleCreateAgent}
+                disabled={creating}
+              >
+                <Ghost className="w-5 h-5" />
+                Create Agent on Sui
+              </Button>
+
+              <p className="text-xs text-[#A7B0C8] text-center">
+                Gas fees are sponsored by GhostPay. No SUI tokens needed.
+              </p>
+            </div>
+
+            <div className="mt-6 rounded-xl bg-[rgba(179,71,255,0.05)] border border-[rgba(179,71,255,0.1)] p-4">
+              <div className="flex items-start gap-3">
+                <Sparkles className="w-4 h-4 text-[#B347FF] mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-[#F4F6FF] mb-1">What happens next?</p>
+                  <ul className="text-xs text-[#A7B0C8] space-y-1">
+                    <li>1. A Move contract creates an Agent object on Sui Testnet</li>
+                    <li>2. The Agent is owned by your zkLogin address</li>
+                    <li>3. You can store encrypted memories on Walrus</li>
+                    <li>4. You can create view-keys for compliance audits</li>
+                    <li>5. All transactions are gasless (Enoki sponsored)</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </motion.div>
         ) : (

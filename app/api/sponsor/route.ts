@@ -12,7 +12,7 @@ import { enokiClient } from "../EnokiClient";
 */
 
 export const POST = async (request: NextRequest) => {
-  const { network, txBytes, sender, allowedAddresses }: SponsorTxRequestBody =
+  const { network, txBytes, sender, allowedAddresses, allowedMoveCallTargets }: SponsorTxRequestBody =
     await request.json();
 
   return enokiClient
@@ -21,6 +21,10 @@ export const POST = async (request: NextRequest) => {
       transactionKindBytes: txBytes,
       sender,
       allowedAddresses,
+      // Only restrict targets when the caller explicitly provides them.
+      // When undefined, the Enoki Portal's API key configuration handles
+      // the allowlist (needed for GhostPay's own contracts to work).
+      allowedMoveCallTargets,
     })
     .then((resp) => {
       return NextResponse.json(resp, {
@@ -29,10 +33,12 @@ export const POST = async (request: NextRequest) => {
     })
     .catch((error) => {
       console.error(error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not create sponsored transaction block.";
       return NextResponse.json(
-        {
-          error: "Could not create sponsored transaction block.",
-        },
+        { error: message },
         {
           status: 500,
         }

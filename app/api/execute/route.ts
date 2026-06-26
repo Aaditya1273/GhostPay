@@ -21,10 +21,12 @@ export const POST = async (request: NextRequest) => {
     })
     .catch((error) => {
       console.error(error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not execute sponsored transaction block.";
       return NextResponse.json(
-        {
-          error: "Could not execute sponsored transaction block.",
-        },
+        { error: message },
         {
           status: 500,
         }

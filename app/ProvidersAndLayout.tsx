@@ -19,6 +19,9 @@ import CustomWalletProvider from "@/contexts/CustomWallet";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { Analytics } from '@vercel/analytics/react';
+import { RemittanceEngineWrapper } from "@/components/RemittanceEngineWrapper";
+import { GhostPayEventIndexer } from "@/components/GhostPayEventIndexer";
+import { AgentEngineWrapper } from "@/components/AgentEngineWrapper";
 
 export interface StorageAdapter {
   setItem(key: string, value: string): Promise<void>;
@@ -79,7 +82,10 @@ export const ProvidersAndLayout = ({ children }: ChildrenProps) => {
                   disableTransitionOnChange
                 >
                   <main>
-                    {children}
+                    <GhostPayEventIndexer />
+          <RemittanceEngineWrapper />
+          <AgentEngineWrapper />
+          {children}
                     <Toaster duration={2000} />
                     <Analytics />
                   </main>

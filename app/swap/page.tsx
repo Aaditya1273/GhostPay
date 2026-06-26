@@ -15,6 +15,7 @@ import {
   Loader2,
   Settings2,
   Info,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,16 +25,20 @@ import {
   parseUserAmount,
   getSwapQuote,
   formatAmount,
+  getSwapLabels,
 } from "@/lib/DeepBookService";
 import { useSuiClient } from "@mysten/dapp-kit";
+import { useBalances } from "@/hooks/useBalances";
 
 export default function SwapPage() {
   const { isUsingEnoki, redirectToAuthUrl, address } = useCustomWallet();
   const suiClient = useSuiClient();
-  const { loading, error, executeSwap } = useDeepBook();
+  const { loading, error, lastReceipt, executeSwap, checkPoolViability } = useDeepBook();
+  const { sui, usdc, deep, refetch: refetchBalances } = useBalances();
 
   // ── State ──────────────────────────────────────────────────────────────
   const [selectedPool, setSelectedPool] = useState(POOL_LIST[0]);
+  const [sellBase, setSellBase] = useState(true);
   const [inputAmount, setInputAmount] = useState("");
   const [slippage, setSlippage] = useState(0.5);
   const [showSettings, setShowSettings] = useState(false);
@@ -41,17 +46,56 @@ export default function SwapPage() {
   const [txStatus, setTxStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
   const [estimatedOutput, setEstimatedOutput] = useState<bigint | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
+  const [poolMsg, setPoolMsg] = useState<string | null>(null);
+  const [poolViable, setPoolViable] = useState(true);
+  const [isSponsorable, setIsSponsorable] = useState(false);
 
   // ── Derived ────────────────────────────────────────────────────────────
-  const fromLabel = selectedPool.sellAsset;
-  const toLabel = selectedPool.buyAsset;
+  const labels = getSwapLabels(selectedPool, sellBase);
+  const fromLabel = labels.sellAsset;
+  const toLabel = labels.buyAsset;
+
+  // ── Pool validation on selection / direction change ────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    const validate = async () => {
+      if (!address) {
+        setPoolMsg("Connect wallet to swap");
+        setPoolViable(false);
+        setIsSponsorable(false);
+        return;
+      }
+      setPoolMsg("Checking pool…");
+      setPoolViable(false);
+      try {
+        const result = await checkPoolViability(selectedPool, sellBase);
+        if (!cancelled) {
+          setPoolMsg(result.viable ? null : result.message);
+          setPoolViable(result.viable);
+          setIsSponsorable(result.sponsorable);
+        }
+      } catch {
+        if (!cancelled) {
+          setPoolMsg("Could not validate pool");
+          setPoolViable(false);
+        }
+      }
+    };
+    // Reset state on pool/direction change
+    setInputAmount("");
+    setTxStatus("idle");
+    setTxDigest(null);
+    setEstimatedOutput(null);
+    validate();
+    return () => { cancelled = true; };
+  }, [selectedPool, sellBase, address, checkPoolViability]);
 
   // ── Live price quoting via devInspectTransactionBlock ─────────────────
   useEffect(() => {
     let cancelled = false;
     const fetchQuote = async () => {
       setEstimatedOutput(null);
-      if (!inputAmount || parseFloat(inputAmount) <= 0 || !address) return;
+      if (!inputAmount || parseFloat(inputAmount) <= 0 || !address || !poolViable) return;
       setQuoteLoading(true);
       try {
         const sellAmount = parseUserAmount(inputAmount, selectedPool.decimals);
@@ -61,7 +105,7 @@ export default function SwapPage() {
           address,
           selectedPool,
           sellAmount,
-          true, // sellBase=true for all our pools
+          sellBase,
         );
         if (!cancelled) setEstimatedOutput(quote);
       } catch {
@@ -70,17 +114,26 @@ export default function SwapPage() {
         if (!cancelled) setQuoteLoading(false);
       }
     };
-    // Debounce: wait 400ms after typing stops before fetching quote
     const timer = setTimeout(fetchQuote, 400);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [inputAmount, selectedPool, address, suiClient]);
+  }, [inputAmount, selectedPool, sellBase, address, suiClient, poolViable]);
+
+  // ── Balance display helper ────────────────────────────────────────────
+  const balanceLabel = (asset: string): string => {
+    switch (asset) {
+      case "SUI": return `${sui.toFixed(4)} SUI`;
+      case "USDC": return `${usdc.toFixed(4)} USDC`;
+      case "DEEP": return `${deep.toFixed(4)} DEEP`;
+      default: return "";
+    }
+  };
 
   // ── Swap handler ───────────────────────────────────────────────────────
   const handleSwap = useCallback(async () => {
-    if (!inputAmount || parseFloat(inputAmount) <= 0) return;
+    if (!inputAmount || parseFloat(inputAmount) <= 0 || !poolViable) return;
 
     setTxDigest(null);
     setTxStatus("pending");
@@ -89,34 +142,31 @@ export default function SwapPage() {
       const sellAmount = parseUserAmount(inputAmount, selectedPool.decimals);
       if (sellAmount <= 0n) throw new Error("Invalid amount");
 
-      // Use the real quote from devInspect, apply slippage to get minOut
+      // Apply slippage to get minOut
       let minOut = 0n;
       if (estimatedOutput && estimatedOutput > 0n) {
-        // Apply slippage: minOut = estimatedOutput * (100 - slippage) / 100
-        const slippageBps = BigInt(Math.round(slippage * 100)); // e.g. 0.5% → 50 bps
+        const slippageBps = BigInt(Math.round(slippage * 100));
         minOut = estimatedOutput * (10000n - slippageBps) / 10000n;
       }
 
-      // Our pools: base → quote means selling BASE to buy QUOTE
-      // For SUI_DBUSDC: sell SUI (base) → buy DBUSDC (quote) => sellBase = true
-      // For DEEP_SUI: sell DEEP (base) → buy SUI (quote) => sellBase = true
-      // For DEEP_DBUSDC: sell DEEP (base) → buy DBUSDC (quote) => sellBase = true
       const digest = await executeSwap(
         selectedPool,
         sellAmount,
         minOut,
-        true, // All our pools sell BASE → buy QUOTE
+        sellBase,
       );
 
       setTxDigest(digest);
       setTxStatus("success");
       setInputAmount("");
       setEstimatedOutput(null);
+      // Force refresh all balances
+      refetchBalances();
     } catch (err: any) {
       const msg = err?.message || "Swap failed";
       setTxStatus("error");
     }
-  }, [inputAmount, selectedPool, estimatedOutput, slippage, executeSwap]);
+  }, [inputAmount, selectedPool, sellBase, estimatedOutput, slippage, executeSwap, poolViable]);
 
   const resetSwap = () => {
     setInputAmount("");
@@ -176,7 +226,7 @@ export default function SwapPage() {
                     key={pool.key}
                     onClick={() => {
                       setSelectedPool(pool);
-                      setInputAmount("");
+                      setSellBase(pool.key === "DEEP_SUI" ? false : true);
                       setTxStatus("idle");
                     }}
                     className={cn(
@@ -192,6 +242,20 @@ export default function SwapPage() {
                 ))}
               </div>
             </div>
+
+            {/* ── Pool Validation Warning ──────────────────────────── */}
+            {poolMsg && !poolViable && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="mb-4 p-3 rounded-xl bg-warning/10 border border-warning/20 text-xs text-warning"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{poolMsg}</span>
+                </div>
+              </motion.div>
+            )}
 
             {/* ── Swap Card ──────────────────────────────────────────── */}
             <div className="rounded-2xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] shadow-sm overflow-hidden">
@@ -258,6 +322,9 @@ export default function SwapPage() {
                 <div className="rounded-xl bg-[rgba(255,255,255,0.03)] p-4">
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-[#A7B0C8]">You pay</label>
+                    <span className="text-xs text-[#A7B0C8]">
+                      Balance: {balanceLabel(fromLabel)}
+                    </span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Input
@@ -329,30 +396,39 @@ export default function SwapPage() {
                     <Info className="w-3 h-3" />
                     <span>Via DeepBook V3 — {selectedPool.label}</span>
                   </div>
-                  <span>Gas: sponsored</span>
+                  <span>{isSponsorable ? "Gas: sponsored (gasless)" : "Gas: user pays (gas coin used)"}</span>
                 </div>
               </div>
 
               {/* Actions */}
               <div className="p-4 pt-0 space-y-3">
-                <Button
-                  className="w-full h-12 text-base font-semibold gap-2 bg-[#B347FF] text-[#0B0C10] hover:scale-105 transition-all duration-300 rounded-full"
-                  onClick={handleSwap}
-                  disabled={
-                    loading ||
-                    !inputAmount ||
-                    parseFloat(inputAmount) <= 0 ||
-                    txStatus === "pending"
-                  }
-                >
-                  {txStatus === "pending" || loading ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> Swapping…</>
-                  ) : !inputAmount || parseFloat(inputAmount) <= 0 ? (
-                    "Enter an amount"
-                  ) : (
-                    <><ArrowLeftRight className="w-5 h-5" /> Swap {fromLabel} for {toLabel}</>
-                  )}
-                </Button>
+                {poolViable ? (
+                  <Button
+                    className="w-full h-12 text-base font-semibold gap-2 bg-[#B347FF] text-[#0B0C10] hover:scale-105 transition-all duration-300 rounded-full"
+                    onClick={handleSwap}
+                    disabled={
+                      loading ||
+                      !inputAmount ||
+                      parseFloat(inputAmount) <= 0 ||
+                      txStatus === "pending"
+                    }
+                  >
+                    {txStatus === "pending" || loading ? (
+                      <><Loader2 className="w-5 h-5 animate-spin" /> Swapping…</>
+                    ) : !inputAmount || parseFloat(inputAmount) <= 0 ? (
+                      "Enter an amount"
+                    ) : (
+                      <><ArrowLeftRight className="w-5 h-5" /> Swap {fromLabel} for {toLabel}</>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full h-12 text-base font-semibold gap-2 bg-[rgba(255,255,255,0.05)] text-[#A7B0C8] rounded-full cursor-not-allowed"
+                    disabled
+                  >
+                    {poolMsg || "Pool not available"}
+                  </Button>
+                )}
 
                 {txStatus === "success" && txDigest && (
                   <motion.div
@@ -375,6 +451,17 @@ export default function SwapPage() {
                     <Button variant="ghost" size="sm" onClick={resetSwap}>
                       New swap
                     </Button>
+                  </motion.div>
+                )}
+
+                {txStatus === "success" && lastReceipt && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-2 p-2 rounded-lg bg-[rgba(255,255,255,0.02)] text-xs text-[#A7B0C8]"
+                  >
+                    <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>Swap receipt stored on Walrus + on-chain memory</span>
                   </motion.div>
                 )}
 
@@ -410,9 +497,12 @@ export default function SwapPage() {
                   <span className="font-medium text-[#F4F6FF]">sell {fromLabel} → buy {toLabel}</span>
                 </div>
                 <div className="flex items-center justify-between p-2 rounded-lg bg-[rgba(255,255,255,0.03)]">
-                  <span className="text-[#A7B0C8]">Wallet</span>
-                  <span className="font-medium font-mono text-[#F4F6FF]">
-                    {address?.slice(0, 6)}...{address?.slice(-4)}
+                  <span className="text-[#A7B0C8]">Gas</span>
+                  <span className={cn(
+                    "font-medium",
+                    isSponsorable ? "text-success" : "text-[#A7B0C8]"
+                  )}>
+                    {isSponsorable ? "Sponsored (gasless)" : "User pays gas"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between p-2 rounded-lg bg-[rgba(255,255,255,0.03)]">

@@ -8,6 +8,7 @@ import { useAgent } from "@/hooks/useAgentQuery";
 import { useMemories } from "@/hooks/useMemoryQuery";
 import { downloadFromWalrus } from "@/lib/WalrusService";
 import { createSessionKey, decryptWithSeal, fetchSealKeys } from "@/lib/SealService";
+import { CLOCK_ID } from "@/lib/constants";
 import LayoutShell from "@/components/LayoutShell";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { motion, AnimatePresence } from "framer-motion";
@@ -87,8 +88,9 @@ export default function CompliancePage() {
       setViewerAddress("");
       setKeyLabel("");
       setDurationDays("180");
-    } catch (err) {
-      toast.error("Failed to create view-key");
+    } catch (err: any) {
+      const msg = err?.message || err?.toString() || "Failed to create view-key";
+      toast.error(msg);
     } finally {
       setGenerating(false);
     }
@@ -101,11 +103,12 @@ export default function CompliancePage() {
       return;
     }
     try {
-      await revokeViewKey(viewKeyId);
+      await revokeViewKey(viewKeyId, agentAddress);
       await logAccess(agentAddress, address!, viewKeyId, "View-key revoked");
       toast.success("View-key revoked");
-    } catch (err) {
-      toast.error("Failed to revoke view-key");
+    } catch (err: any) {
+      const msg = err?.message || err?.toString() || "Failed to revoke view-key";
+      toast.error(msg);
     }
   };
 
@@ -143,7 +146,6 @@ export default function CompliancePage() {
       const { Transaction } = await import("@mysten/sui/transactions");
       const tx = new Transaction();
       tx.setSender(address);
-      const CLOCK_ID = "0x6";
       tx.moveCall({
         target: `${clientConfig.PACKAGE_ID}::compliance::seal_approve`,
         arguments: [
@@ -222,7 +224,7 @@ export default function CompliancePage() {
     entity: l.viewer.slice(0, 10) + "...",
     date: l.dateStr,
     status: "completed" as const,
-    type: "access" as const,
+    type: "access" as "access" | "share" | "revoke",
   }));
 
   return (
