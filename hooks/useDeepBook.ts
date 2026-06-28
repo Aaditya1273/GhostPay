@@ -208,7 +208,7 @@ export function useDeepBook() {
           allowedMoveCallTargets: [
             `${DEEPBOOK_PACKAGE_ID}::pool::swap_exact_base_for_quote`,
             `${DEEPBOOK_PACKAGE_ID}::pool::swap_exact_quote_for_base`,
-            "0x2::coin::zero",
+            "0x0000000000000000000000000000000000000000000000000000000000000002::coin::zero",
           ],
           options: {
             showEffects: true,
