@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { ConnectModal, useCurrentAccount } from '@mysten/dapp-kit';
-import { useRouter } from 'next/navigation';
-import '@mysten/dapp-kit/dist/index.css';
+
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -11,10 +9,7 @@ export default function Navigation() {
   const navRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [connectOpen, setConnectOpen] = useState(false);
   
-  const currentAccount = useCurrentAccount();
-  const router = useRouter();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -74,25 +69,6 @@ export default function Navigation() {
             <button onClick={() => scrollToSection('footer')} className="text-sm text-[#A7B0C8] hover:text-[#F4F6FF] transition-colors duration-300">
               Docs
             </button>
-            
-            {currentAccount ? (
-              <button 
-                onClick={() => router.push('/dashboard')}
-                className="px-5 py-2 rounded-full border border-[rgba(255,255,255,0.2)] text-sm text-[#F4F6FF] hover:border-[#B347FF] hover:text-[#B347FF] transition-all duration-300"
-              >
-                Continue to Dashboard
-              </button>
-            ) : (
-              <ConnectModal
-                trigger={
-                  <button className="px-5 py-2 rounded-full border border-[rgba(255,255,255,0.2)] text-sm text-[#F4F6FF] hover:border-[#B347FF] hover:text-[#B347FF] transition-all duration-300">
-                    Connect Wallet
-                  </button>
-                }
-                open={connectOpen}
-                onOpenChange={setConnectOpen}
-              />
-            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -125,28 +101,6 @@ export default function Navigation() {
               {item.label}
             </button>
           ))}
-          
-          {currentAccount ? (
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="menu-link mt-6 px-8 py-3 rounded-full bg-[#B347FF] text-[#0B0C10] font-heading font-medium hover:scale-105 transition-transform duration-300"
-            >
-              Continue to Dashboard
-            </button>
-          ) : (
-            <ConnectModal
-              trigger={
-                <button className="menu-link mt-6 px-8 py-3 rounded-full bg-[#B347FF] text-[#0B0C10] font-heading font-medium hover:scale-105 transition-transform duration-300">
-                  Connect Wallet
-                </button>
-              }
-              open={connectOpen}
-              onOpenChange={(isOpen) => {
-                setConnectOpen(isOpen);
-                if (isOpen) setMenuOpen(false);
-              }}
-            />
-          )}
         </div>
       </div>
     </>

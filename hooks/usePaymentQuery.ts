@@ -76,7 +76,8 @@ export function usePayments() {
           | undefined;
         if (!fields?.fields) return null;
         const f = fields.fields;
-        const amount = Number(f.amount);
+        const rawAmount = Number(f.amount);
+        const amount = f.currency === "USDC" ? rawAmount / 1_000_000 : rawAmount / 1_000_000_000;
         return {
           id: f.id.id,
           seq: Number(f.seq),

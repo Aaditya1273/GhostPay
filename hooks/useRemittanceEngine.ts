@@ -67,7 +67,7 @@ export function useRemittanceEngine(): EngineStatus {
   const [currentAmount, setCurrentAmount] = useState(0);
 
   // Track previous SUI balance so we can detect increases.
-  const prevSuiRef = useRef(sui);
+  const prevSuiRef = useRef<number | null>(null);
   // Serialisation lock — prevents concurrent pipeline runs.
   const runningRef = useRef(false);
 
@@ -232,12 +232,18 @@ export function useRemittanceEngine(): EngineStatus {
 
   useEffect(() => {
     if (!address || !agentId) {
-      prevSuiRef.current = sui;
+      prevSuiRef.current = null;
+      return;
+    }
+
+    const current = sui;
+
+    if (prevSuiRef.current === null) {
+      prevSuiRef.current = current;
       return;
     }
 
     const prev = prevSuiRef.current;
-    const current = sui;
 
     if (current > prev) {
       const delta = current - prev;

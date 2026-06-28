@@ -378,14 +378,7 @@ export default function DashboardPage() {
                       stat.color
                     )} />
                     <div className="relative z-10">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className={cn(
-                          "flex items-center justify-center w-9 h-9 rounded-lg",
-                          stat.iconColor,
-                          "bg-current/10"
-                        )}>
-                          <Icon className="w-4 h-4" />
-                        </div>
+                      <div className="flex items-center justify-end mb-3">
                         <span className={cn(
                           "text-xs font-medium px-2 py-0.5 rounded-full",
                           stat.positive
@@ -412,22 +405,23 @@ export default function DashboardPage() {
               <h2 className="font-heading text-sm font-medium text-[#A7B0C8] mb-3 uppercase tracking-wider">Quick Actions</h2>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
-                  { label: "Send Payment", icon: Send, href: "/payments", desc: "Transfer funds globally" },
-                  { label: "View Wallet", icon: Wallet, href: "/wallet", desc: "Agent wallet details" },
-                  { label: "Store Memory", icon: Database, href: "/vault", desc: "Encrypt to Walrus" },
-                  { label: "Share Access", icon: Shield, href: "/compliance", desc: "Manage view-keys" },
+                  { label: "Send Payment", src: "/sui.png", href: "/payments", desc: "Transfer funds globally" },
+                  { label: "View Wallet", src: "/images/ghost-mascot.png", href: "/wallet", desc: "Agent wallet details" },
+                  { label: "Store Memory", src: "/seal.png", href: "/vault", desc: "Encrypt to Walrus" },
+                  { label: "Share Access", src: "/seale.png", href: "/compliance", desc: "Manage view-keys" },
                 ].map((action) => {
-                  const Icon = action.icon;
                   return (
                     <a
                       key={action.label}
                       href={action.href}
                       className="flex flex-col gap-2 p-4 rounded-xl bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(179,71,255,0.1)] transition-all duration-200 group cursor-pointer"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary">
-                          <Icon className="w-4 h-4" />
-                        </div>
+                      <div className="flex items-center justify-between mb-1">
+                        <img 
+                          src={action.src} 
+                          alt={action.label} 
+                          className="w-10 h-10 rounded-xl object-cover"
+                        />
                         <ArrowUpRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                       <div>

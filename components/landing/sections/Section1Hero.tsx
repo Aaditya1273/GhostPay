@@ -3,10 +3,12 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Zap, Lock, Calendar } from 'lucide-react';
 import GhostMascot from '../GhostMascot';
+import { useRouter } from 'next/navigation';
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function Section1Hero() {
+  const router = useRouter();
   const sectionRef = useRef<HTMLElement>(null);
   const heroCardRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
@@ -292,6 +294,7 @@ export default function Section1Hero() {
 
             <button
               ref={ctaRef}
+              onClick={() => router.push('/dashboard')}
               className="px-6 md:px-8 py-3 md:py-3.5 rounded-full bg-[#B347FF] text-[#0B0C10] font-heading font-semibold text-sm md:text-base hover:scale-105 hover:shadow-[0_0_30px_rgba(179,71,255,0.4)] transition-all duration-300 opacity-0"
             >
               Summon GhostPay
