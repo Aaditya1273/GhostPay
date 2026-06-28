@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useCustomWallet } from "@/contexts/CustomWallet";
 import { useMemories } from "@/hooks/useMemoryQuery";
 import { useWalrusUpload, type UploadStep } from "@/hooks/useWalrusUpload";
@@ -36,6 +36,7 @@ import { Label } from "@/components/ui/label";
 import { downloadFromWalrus, getBlobUrl } from "@/lib/WalrusService";
 import clientConfig from "@/config/clientConfig";
 import { toast } from "sonner";
+import { useLoadingDeadlock } from "@/lib/demoProof";
 
 const isPackageDeployed = !!(
   clientConfig.PACKAGE_ID && clientConfig.PACKAGE_ID !== "0x0"
@@ -62,10 +63,12 @@ const uploadStepMessages: Record<UploadStep, string> = {
 };
 
 export default function VaultPage() {
-  const { isUsingEnoki, redirectToAuthUrl, address } = useCustomWallet();
+  const { isUsingEnoki, redirectToAuthUrl, address, authLoading } = useCustomWallet();
   const { memories: chainMemories, isPending } = useMemories();
   const { agentId: agentObjectId } = useAgent();
   const { state: uploadState, upload, reset: resetUpload } = useWalrusUpload();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -74,6 +77,20 @@ export default function VaultPage() {
   const [isPrivate, setIsPrivate] = useState(true);
   const [showDataTypePicker, setShowDataTypePicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Loading deadlock protection ──────────────────────────────────────
+  const isUploading = uploadState.step === "encrypting" || uploadState.step === "uploading" || uploadState.step === "storing";
+  const { timedOut: uploadTimedOut, reset: resetDeadlock } = useLoadingDeadlock(isUploading);
+
+  // ── Escape key handler ─────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (showUploadModal && !isUploading) { handleCloseModal(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showUploadModal, isUploading]);
 
   const displayMemories = chainMemories.map((m) => ({
     id: m.id,
@@ -194,7 +211,7 @@ export default function VaultPage() {
                 </p>
               </div>
             </div>
-            {isUsingEnoki && (
+            {mounted && isUsingEnoki && (
               <Button
                 className="gap-2 hidden sm:flex bg-[#B347FF] text-[#0B0C10] rounded-full font-semibold hover:bg-[#A03FE6]"
                 onClick={() => setShowUploadModal(true)}
@@ -206,7 +223,7 @@ export default function VaultPage() {
           </div>
         </motion.div>
 
-        {!isUsingEnoki ? (
+        {!mounted ? null : !isUsingEnoki ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -218,8 +235,9 @@ export default function VaultPage() {
               <p className="text-muted-foreground mb-4">
                 Sign in to access your encrypted Walrus storage. Your memories are private by default.
               </p>
-              <Button onClick={redirectToAuthUrl} size="lg" className="gap-2">
-                Sign in with Google
+              <Button onClick={redirectToAuthUrl} size="lg" className="gap-2" disabled={authLoading}>
+                {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {authLoading ? "Redirecting…" : "Sign in with Google"}
               </Button>
             </div>
           </motion.div>
@@ -575,6 +593,14 @@ export default function VaultPage() {
                         {uploadStepMessages[uploadState.step]}
                       </span>
                     </div>
+
+                    {/* Deadlock warning */}
+                    {uploadTimedOut && isUploading && (
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-warning/10 border border-warning/20 text-xs text-warning">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>Upload is taking longer than expected. The Walrus publisher may be slow — please wait or cancel and retry.</span>
+                      </div>
+                    )}
 
                     {/* Success Details */}
                     {uploadState.step === "done" && uploadState.result.blobId && (

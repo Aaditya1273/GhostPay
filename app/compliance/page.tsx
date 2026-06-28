@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCustomWallet } from "@/contexts/CustomWallet";
-import { useViewKeys, useAccessLogs } from "@/hooks/useComplianceQuery";
+import { useViewKeys, useAccessLogs, useViewKeyStatus, useAuditTrail, useComplianceReport, useDecryptHistory } from "@/hooks/useComplianceQuery";
 import { useComplianceTransaction } from "@/hooks/useComplianceTransaction";
 import { useAgent } from "@/hooks/useAgentQuery";
 import { useMemories } from "@/hooks/useMemoryQuery";
@@ -29,6 +29,10 @@ import {
   Unlock,
   Plus,
   Trash2,
+  Download,
+  BarChart3,
+  ScrollText,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,6 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import clientConfig from "@/config/clientConfig";
+import { useLoadingDeadlock } from "@/lib/demoProof";
 
 const isPackageDeployed = !!(
   clientConfig.PACKAGE_ID && clientConfig.PACKAGE_ID !== "0x0"
@@ -43,7 +48,7 @@ const isPackageDeployed = !!(
 
 
 export default function CompliancePage() {
-  const { isUsingEnoki, redirectToAuthUrl, address } = useCustomWallet();
+  const { isUsingEnoki, redirectToAuthUrl, address, authLoading } = useCustomWallet();
   const suiClient = useSuiClient();
   const { viewKeys } = useViewKeys();
   const { logs: accessLogs } = useAccessLogs();
@@ -60,10 +65,32 @@ export default function CompliancePage() {
   const [generating, setGenerating] = useState(false);
 
   // ── SEAL decrypt demo ──────────────────────────────────────────────────
+  // ── Enterprise compliance hooks ─────────────────────────────────────────
+  const { validated: validatedKeys, expired: expiredKeys, active: activeKeys } = useViewKeyStatus();
+  const { auditEntries, granted, denied, downloadAuditCsv, downloadAuditJson, logAccessAttempt } = useAuditTrail();
+  const { report, downloadReport } = useComplianceReport();
+  const { history: decryptHistory, addEntry: addDecryptEntry } = useDecryptHistory();
+
   const [decryptingId, setDecryptingId] = useState<string | null>(null);
   const [decryptedContent, setDecryptedContent] = useState<string | null>(null);
   const [showDecryptModal, setShowDecryptModal] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState<any>(null);
+
+  // ── Loading deadlock protection ──────────────────────────────────────
+  const { timedOut: generateTimedOut } = useLoadingDeadlock(generating);
+  const isDecrypting = decryptingId !== null;
+  const { timedOut: decryptTimedOut } = useLoadingDeadlock(isDecrypting);
+
+  // ── Escape key handler ─────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (showDecryptModal && !isDecrypting) { setShowDecryptModal(false); setDecryptedContent(null); return; }
+      if (showGenerateModal && !generating) { setShowGenerateModal(false); return; }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showDecryptModal, showGenerateModal, generating, isDecrypting]);
 
   const copyKey = (key: string) => {
     navigator.clipboard.writeText(key);
@@ -129,9 +156,17 @@ export default function CompliancePage() {
       toast.info("Downloading encrypted blob from Walrus…");
       const { data: encryptedData } = await downloadFromWalrus(memory.blobId);
 
-      // 2. Create SEAL session key for this user
-      // If a signer (Enoki) is available, the session key will be authenticated
-      // via personal message signature. Otherwise, it works in anonymous mode.
+      // Quick check: if data is NOT SEAL-encrypted (e.g. public blob), just
+      // show the raw content without going through the SEAL flow.
+      const isSealEncrypted = encryptedData.length > 0 && (encryptedData[0] === 0 || encryptedData[0] === 1);
+      if (!isSealEncrypted) {
+        const text = new TextDecoder().decode(encryptedData);
+        setDecryptedContent(text);
+        toast.success("Memory loaded from Walrus");
+        return;
+      }
+
+      // 2. Create SEAL session key
       toast.info("Creating SEAL session key…");
       const sessionKey = await createSessionKey(
         { suiClient },
@@ -139,10 +174,7 @@ export default function CompliancePage() {
         clientConfig.PACKAGE_ID,
       );
 
-      // 3. Build a full transaction that calls seal_approve
-      // This generates proper txBytes that the SEAL key servers can validate.
-      // Using a full transaction (not onlyTransactionKind) ensures the key
-      // servers can verify the transaction's intent to call seal_approve.
+      // 3. Build the seal_approve transaction
       const { Transaction } = await import("@mysten/sui/transactions");
       const tx = new Transaction();
       tx.setSender(address);
@@ -155,12 +187,9 @@ export default function CompliancePage() {
           tx.object(CLOCK_ID),
         ],
       });
-      // Build full transaction bytes (not just transaction kind) so key
-      // servers can fully validate the seal_approve call
       const txBytes = await tx.build({ client: suiClient });
 
       // 4. Fetch SEAL keys from key servers
-      // This authenticates with the key servers and retrieves decryption shares
       toast.info("Fetching decryption keys from SEAL key servers…");
       await fetchSealKeys(
         { suiClient, packageId: clientConfig.PACKAGE_ID },
@@ -169,7 +198,7 @@ export default function CompliancePage() {
         sessionKey,
       );
 
-      // 5. Decrypt the data using the fetched keys
+      // 5. Decrypt
       toast.info("Decrypting…");
       const decrypted = await decryptWithSeal(
         { suiClient, packageId: clientConfig.PACKAGE_ID },
@@ -183,27 +212,46 @@ export default function CompliancePage() {
       toast.success("Memory decrypted successfully via SEAL");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Decryption failed";
-      // Provide helpful error messages for common failure modes
-      if (message.includes("key server") || message.includes("NoAccess")) {
+
+      // Classify the error and provide an actionable message
+      if (
+        message.includes("seal_approve") ||
+        message.includes("function not found") ||
+        message.includes("MoveAbort") ||
+        message.includes("module not found")
+      ) {
         setDecryptedContent(
-          "🔒 SEAL encryption detected.\n\n" +
-          "The data was encrypted with SEAL before being stored on Walrus. " +
-          "To decrypt, you need:\n\n" +
-          "1. An Enoki signer configured (for personal message signing)\n" +
-          "2. SEAL key servers reachable (seal-aggregator-testnet.mystenlabs.com)\n" +
-          "3. A deployed compliance::seal_approve function in your Move package\n\n" +
-          "The encrypted data remains safely stored on Walrus in the meantime."
+          "🔒 SEAL encryption detected — awaiting contract deployment.\n\n" +
+          "The compliance::seal_approve function needs to exist in the deployed " +
+          "Move package before SEAL decryption can authorize key release.\n\n" +
+          "Package ID: " + clientConfig.PACKAGE_ID + "\n" +
+          "Blob ID: " + memory.blobId + "\n\n" +
+          "The encrypted data remains safely stored on Walrus and can be " +
+          "decrypted once the compliance module is deployed.",
         );
-      } else if (message.includes("transaction kind") || message.includes("build")) {
+      } else if (
+        message.includes("key server") ||
+        message.includes("NoAccess") ||
+        message.includes("aggregator") ||
+        message.includes("fetch")
+      ) {
         setDecryptedContent(
-          `⚠️ Transaction build error: ${message}\n\n` +
-          "This is likely because the compliance::seal_approve function does not exist " +
-          "in the deployed package yet. The SEAL key servers need this function to validate " +
-          "authorization for decryption."
+          "⚠️ SEAL key server unreachable.\n\n" +
+          "Could not contact seal-aggregator-testnet.mystenlabs.com.\n\n" +
+          "Please check your network connection and try again. " +
+          "Your encrypted data is safely stored on Walrus.",
+        );
+      } else if (message.includes("build") || message.includes("transaction")) {
+        setDecryptedContent(
+          "⚠️ Transaction build error: " + message + "\n\n" +
+          "This usually means the compliance module functions have a " +
+          "signature mismatch. Verify the deployed package matches the frontend.",
         );
       } else {
-        setDecryptedContent(`❌ Decryption error: ${message}`);
+        setDecryptedContent("❌ Decryption error: " + message);
       }
+
+      toast.error("SEAL decryption failed — see details in panel");
     } finally {
       setDecryptingId(null);
     }
@@ -260,8 +308,9 @@ export default function CompliancePage() {
               <p className="text-muted-foreground mb-4">
                 Sign in to manage view-keys, share access via SEAL, and review your compliance dashboard.
               </p>
-              <Button onClick={redirectToAuthUrl} size="lg" className="gap-2">
-                Sign in with Google
+              <Button onClick={redirectToAuthUrl} size="lg" className="gap-2" disabled={authLoading}>
+                {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {authLoading ? "Redirecting…" : "Sign in with Google"}
               </Button>
             </div>
           </motion.div>

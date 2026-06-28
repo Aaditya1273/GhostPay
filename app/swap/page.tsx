@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useCustomWallet } from "@/contexts/CustomWallet";
 import LayoutShell from "@/components/LayoutShell";
 import { useDeepBook } from "@/hooks/useDeepBook";
+import { useFluxStream } from "@/hooks/useFluxStream";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeftRight,
@@ -16,6 +17,9 @@ import {
   Settings2,
   Info,
   FileText,
+  Zap,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -29,12 +33,17 @@ import {
 } from "@/lib/DeepBookService";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useBalances } from "@/hooks/useBalances";
+import { useLoadingDeadlock } from "@/lib/demoProof";
 
 export default function SwapPage() {
-  const { isUsingEnoki, redirectToAuthUrl, address } = useCustomWallet();
+  const { isUsingEnoki, redirectToAuthUrl, address, authLoading } = useCustomWallet();
   const suiClient = useSuiClient();
   const { loading, error, lastReceipt, executeSwap, checkPoolViability } = useDeepBook();
   const { sui, usdc, deep, refetch: refetchBalances } = useBalances();
+  // Real-time DeepBook Flux Stream
+  const fluxState = useFluxStream(isUsingEnoki);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // ── State ──────────────────────────────────────────────────────────────
   const [selectedPool, setSelectedPool] = useState(POOL_LIST[0]);
@@ -44,16 +53,26 @@ export default function SwapPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [txDigest, setTxDigest] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
+  const [txError, setTxError] = useState<string | null>(null);
   const [estimatedOutput, setEstimatedOutput] = useState<bigint | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [poolMsg, setPoolMsg] = useState<string | null>(null);
   const [poolViable, setPoolViable] = useState(true);
   const [isSponsorable, setIsSponsorable] = useState(false);
 
+  // ── Loading deadlock protection ──────────────────────────────────────
+  // Covers both the swap transaction and pool-check loading state
+  const isPending = loading || txStatus === "pending";
+
   // ── Derived ────────────────────────────────────────────────────────────
   const labels = getSwapLabels(selectedPool, sellBase);
   const fromLabel = labels.sellAsset;
   const toLabel = labels.buyAsset;
+
+  // Live price from Flux stream for the selected pool
+  const livePoolState = fluxState.pools[selectedPool.key];
+  const livePrice = livePoolState?.lastPrice ?? null;
+  const recentTrades = livePoolState?.recentTrades ?? [];
 
   // ── Pool validation on selection / direction change ────────────────────
   useEffect(() => {
@@ -164,6 +183,7 @@ export default function SwapPage() {
       refetchBalances();
     } catch (err: any) {
       const msg = err?.message || "Swap failed";
+      setTxError(msg);
       setTxStatus("error");
     }
   }, [inputAmount, selectedPool, sellBase, estimatedOutput, slippage, executeSwap, poolViable]);
@@ -171,6 +191,7 @@ export default function SwapPage() {
   const resetSwap = () => {
     setInputAmount("");
     setTxDigest(null);
+    setTxError(null);
     setTxStatus("idle");
   };
 
@@ -195,7 +216,7 @@ export default function SwapPage() {
           </div>
         </motion.div>
 
-        {!isUsingEnoki ? (
+        {!mounted ? null : !isUsingEnoki ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -256,6 +277,67 @@ export default function SwapPage() {
                 </div>
               </motion.div>
             )}
+
+            {/* ── Flux Stream: Live Price Ticker ───────────────────── */}
+            <AnimatePresence>
+              {!fluxState.subscriptionUnsupported && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] px-4 py-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        fluxState.connected ? "bg-success animate-pulse" : "bg-muted"
+                      )} />
+                      <span className="text-xs text-muted-foreground">
+                        {fluxState.connected
+                          ? `Flux Stream · ${fluxState.eventCount} events`
+                          : "Connecting to DeepBook Flux Stream…"}
+                      </span>
+                    </div>
+                    {livePrice !== null && (
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="w-3 h-3 text-warning" />
+                        <span className="text-sm font-medium font-mono text-[#F4F6FF]">
+                          {livePrice < 1
+                            ? livePrice.toFixed(6)
+                            : livePrice.toFixed(4)}{" "}
+                          {toLabel}/{fromLabel}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recent trades mini-tape */}
+                  {recentTrades.length > 0 && (
+                    <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-1">
+                      {recentTrades.slice(0, 8).map((trade, i) => (
+                        <div
+                          key={`${trade.txDigest}-${i}`}
+                          className={cn(
+                            "flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] whitespace-nowrap border flex-shrink-0",
+                            trade.side === "buy"
+                              ? "border-success/20 bg-success/5 text-success"
+                              : "border-destructive/20 bg-destructive/5 text-destructive"
+                          )}
+                        >
+                          {trade.side === "buy"
+                            ? <TrendingUp className="w-2.5 h-2.5" />
+                            : <TrendingDown className="w-2.5 h-2.5" />}
+                          {trade.price < 1
+                            ? trade.price.toFixed(5)
+                            : trade.price.toFixed(3)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* ── Swap Card ──────────────────────────────────────────── */}
             <div className="rounded-2xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] shadow-sm overflow-hidden">
@@ -472,7 +554,7 @@ export default function SwapPage() {
                     className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-sm text-destructive"
                   >
                     <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-                    <span className="flex-1">{error || "Transaction failed"}</span>
+                    <span className="flex-1">{txError || error || "Transaction failed"}</span>
                     <Button variant="ghost" size="sm" onClick={resetSwap}>
                       Dismiss
                     </Button>

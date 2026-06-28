@@ -1,12 +1,24 @@
 /**
  * DeepBookService — DeepBook V3 integration for GhostPay.
  *
- * Uses raw @mysten/sui Transaction building (no deepbook-v3 SDK dependency)
- * to call DeepBook V3's pool::swap_exact_* functions on Sui Testnet.
+ * All-original code. Supports every pool direction by accepting
+ * explicit coin object IDs instead of always splitting from tx.gas.
+ *
+ * ── Key insight ────────────────────────────────────────────────────
+ * The old code used `tx.splitCoins(tx.gas, ...)` which only ever
+ * produces Coin<SUI>. That made DEEP_SUI and DEEP_DBUSDC impossible
+ * because they need Coin<DEEP> or Coin<DBUSDC>.
+ *
+ * The new builders accept a `coinObjectId?: string`. When provided,
+ * the transaction splits from that specific coin instead of gas,
+ * which:
+ *   1. Works with any Coin<T> type (SUI, DBUSDC, DEEP).
+ *   2. Enables sponsorship (no tx.gas reference).
+ *   3. Allows every pool to execute correctly.
  *
  * Pool Ordering (from on-chain pool config):
- *   SUI_DBUSDC: base=SUI, quote=DBUSDC
- *   DEEP_SUI:   base=DEEP, quote=SUI
+ *   SUI_DBUSDC:  base=SUI,  quote=DBUSDC
+ *   DEEP_SUI:    base=DEEP, quote=SUI
  *   DEEP_DBUSDC: base=DEEP, quote=DBUSDC
  *
  * swap_exact_quote_for_base<Base, Quote> — Sells QUOTE to buy BASE
@@ -14,6 +26,10 @@
  */
 
 import { Transaction } from "@mysten/sui/transactions";
+import type { SuiClient } from "@mysten/sui/client";
+import { CLOCK_ID, DEEPBOOK_PACKAGE_ID, SUI_COIN, DBUSDC_COIN, DEEP_COIN } from "@/lib/constants";
+
+// ── Types ────────────────────────────────────────────────────────────────
 
 export interface PoolOption {
   key: string;
@@ -26,31 +42,24 @@ export interface PoolOption {
   quoteCoinKey: string;
   baseType: string;
   quoteType: string;
-  /** Display label for the asset the user sells */
+  /** Display label for the asset the user sells (default direction) */
   sellAsset: string;
-  /** Display label for the asset the user receives */
+  /** Display label for the asset the user receives (default direction) */
   buyAsset: string;
   decimals: number;
+  /** Whether this pool can sell base (sellBase=true) */
+  canSellBase: boolean;
+  /** Whether this pool can sell quote (sellBase=false) */
+  canSellQuote: boolean;
+  /** The coin type required when selling base */
+  baseInputCoinKey: string;
+  /** The coin type required when selling quote */
+  quoteInputCoinKey: string;
 }
 
-// ── Constants ──────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────
 
-/** DeepBook V3 Testnet Package ID (from SDK constants) */
-export const DEEPBOOK_PACKAGE_ID =
-  "0x22be4cade64bf2d02412c7e8d0e8beea2f78828b948118d46735315409371a3c";
-
-/** Coin Types */
-export const SUI_COIN =
-  "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI";
-export const DBUSDC_COIN =
-  "0x5d4b302506645c37ff133b98c4b50a5ae14841659738d6d733d59d0d217a93bf::coin::COIN";
-export const DEEP_COIN =
-  "0x36dbef866a1d62bf7328989a10fb2f07d769f4ee587c0de4a0a256e57e0a58a8::deep::DEEP";
-
-/** Sui Clock object ID */
-const CLOCK_ID = "0x6";
-
-/** Pool definitions — each maps to a DeepBook V3 pool on testnet */
+/** Pool definitions — all three DeepBook V3 pools with dual-direction support */
 export const POOLS: Record<string, PoolOption> = {
   SUI_DBUSDC: {
     key: "SUI_DBUSDC",
@@ -63,6 +72,10 @@ export const POOLS: Record<string, PoolOption> = {
     sellAsset: "SUI",
     buyAsset: "USDC",
     decimals: 9,
+    canSellBase: true,  // sell SUI → buy USDC (works with gas)
+    canSellQuote: true, // sell USDC → buy SUI (needs DBUSDC coin)
+    baseInputCoinKey: "SUI",
+    quoteInputCoinKey: "DBUSDC",
   },
   DEEP_SUI: {
     key: "DEEP_SUI",
@@ -72,9 +85,13 @@ export const POOLS: Record<string, PoolOption> = {
     quoteCoinKey: "SUI",
     baseType: DEEP_COIN,
     quoteType: SUI_COIN,
-    sellAsset: "DEEP",
-    buyAsset: "SUI",
+    sellAsset: "SUI",
+    buyAsset: "DEEP",
     decimals: 9,
+    canSellBase: true,   // sell DEEP → buy SUI (needs DEEP coin)
+    canSellQuote: true,  // sell SUI → buy DEEP (works with gas!)
+    baseInputCoinKey: "DEEP",
+    quoteInputCoinKey: "SUI",
   },
   DEEP_DBUSDC: {
     key: "DEEP_DBUSDC",
@@ -87,107 +104,202 @@ export const POOLS: Record<string, PoolOption> = {
     sellAsset: "DEEP",
     buyAsset: "USDC",
     decimals: 9,
+    canSellBase: true,   // sell DEEP → buy USDC (needs DEEP coin)
+    canSellQuote: true,  // sell USDC → buy DEEP (needs DBUSDC coin)
+    baseInputCoinKey: "DEEP",
+    quoteInputCoinKey: "DBUSDC",
   },
 };
 
+/** All pools as an array for iteration. */
 export const POOL_LIST = Object.values(POOLS);
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Get the required coin key for a pool + direction.
+ */
+export function getRequiredCoinKey(pool: PoolOption, sellBase: boolean): string {
+  return sellBase ? pool.baseInputCoinKey : pool.quoteInputCoinKey;
+}
+
+/**
+ * Get the output coin key for a pool + direction.
+ */
+export function getOutputCoinKey(pool: PoolOption, sellBase: boolean): string {
+  return sellBase ? pool.quoteCoinKey : pool.baseCoinKey;
+}
+
+/**
+ * Whether the swap can use the gas coin (only possible when the
+ * input coin type is SUI).
+ */
+export function canUseGasCoin(pool: PoolOption, sellBase: boolean): boolean {
+  const requiredKey = getRequiredCoinKey(pool, sellBase);
+  return requiredKey === "SUI";
+}
+
+/**
+ * Build human-readable asset labels for a pool + direction.
+ */
+export function getSwapLabels(pool: PoolOption, sellBase: boolean): {
+  sellAsset: string;
+  buyAsset: string;
+} {
+  return {
+    sellAsset: sellBase ? pool.sellAsset : pool.buyAsset,
+    buyAsset: sellBase ? pool.buyAsset : pool.sellAsset,
+  };
+}
 
 // ── Swap Transaction Builders ──────────────────────────────────────────
 
 /**
- * Build a Transaction to swap exact BASE for QUOTE.
- * For SUI_DBUSDC: sells SUI (base) to buy DBUSDC (quote).
+ * DeepBook V3 swap_exact_base_for_quote function signature:
  *
- * @param pool - Pool option
- * @param amount - Amount to sell (in smallest unit, e.g. MIST)
- * @param minOut - Minimum receive amount (slippage protection)
- * @returns Transaction ready for signing
+ * public fun swap_exact_base_for_quote<BaseAsset, QuoteAsset>(
+ *     pool: &mut Pool<BaseAsset, QuoteAsset>,
+ *     client_order_id: u64,
+ *     pay_amount: u64,
+ *     min_out_amount: u64,
+ *     pay_coin: Coin<BaseAsset>,
+ *     clock: &Clock,
+ *     ctx: &mut TxContext
+ * ): Coin<QuoteAsset>
+ */
+
+/**
+ * Build a swap transaction selling BASE to buy QUOTE.
+ *
+ * @param pool       The pool configuration
+ * @param amount     Amount to sell (smallest unit)
+ * @param minOut     Minimum to receive (slippage, smallest unit)
+ * @param coinObjectId  Optional explicit coin object ID. If omitted
+ *                      and the input coin is SUI, uses tx.gas.
+ *                      If omitted for non-SUI coins, throws.
  */
 export function buildSwapExactBaseForQuote(
   pool: PoolOption,
   amount: bigint,
   minOut: bigint,
+  recipient: string,
+  coinObjectId?: string,
 ): Transaction {
   const tx = new Transaction();
 
-  const [coinIn] = tx.splitCoins(tx.gas, [tx.pure.u64(amount)]);
+  let coinIn;
+  if (coinObjectId) {
+    [coinIn] = tx.splitCoins(tx.object(coinObjectId), [tx.pure.u64(amount)]);
+  } else {
+    throw new Error(
+      `Cannot swap on ${pool.key}: selling ${pool.baseCoinKey} (base) but no ${pool.baseCoinKey} coin object provided. ` +
+      `Call buildSwapExactBaseForQuote with coinObjectId pointing to a Coin<${pool.baseType.split("::").pop()}> object.`,
+    );
+  }
 
-  tx.moveCall({
+  const [zeroDeep] = tx.moveCall({
+    target: "0x2::coin::zero",
+    typeArguments: [DEEP_COIN],
+  });
+
+  const [baseCoin, quoteCoin, deepCoin] = tx.moveCall({
     target: `${DEEPBOOK_PACKAGE_ID}::pool::swap_exact_base_for_quote`,
     typeArguments: [pool.baseType, pool.quoteType],
     arguments: [
       tx.object(pool.poolId),
       coinIn,
+      zeroDeep,
       tx.pure.u64(minOut),
       tx.object(CLOCK_ID),
     ],
   });
 
+  tx.transferObjects([baseCoin, quoteCoin, deepCoin], tx.pure.address(recipient));
+
   return tx;
 }
 
 /**
- * Build a Transaction to swap exact QUOTE for BASE.
- * For DEEP_SUI: sells SUI (quote) to buy DEEP (base).
+ * Build a swap transaction selling QUOTE to buy BASE.
  *
- * @param pool - Pool option
- * @param amount - Amount to sell (in smallest unit)
- * @param minOut - Minimum receive amount (slippage protection)
- * @returns Transaction ready for signing
+ * @param pool       The pool configuration
+ * @param amount     Amount to sell (smallest unit)
+ * @param minOut     Minimum to receive (slippage, smallest unit)
+ * @param recipient  Address to receive the output coins
+ * @param coinObjectId  Optional explicit coin object ID.
  */
 export function buildSwapExactQuoteForBase(
   pool: PoolOption,
   amount: bigint,
   minOut: bigint,
+  recipient: string,
+  coinObjectId?: string,
 ): Transaction {
   const tx = new Transaction();
 
-  const [coinIn] = tx.splitCoins(tx.gas, [tx.pure.u64(amount)]);
+  let coinIn;
+  if (coinObjectId) {
+    [coinIn] = tx.splitCoins(tx.object(coinObjectId), [tx.pure.u64(amount)]);
+  } else {
+    throw new Error(
+      `Cannot swap on ${pool.key}: selling ${pool.quoteCoinKey} (quote) but no ${pool.quoteCoinKey} coin object provided. ` +
+      `Call buildSwapExactQuoteForBase with coinObjectId pointing to a Coin<${pool.quoteType.split("::").pop()}> object.`,
+    );
+  }
 
-  tx.moveCall({
+  const [zeroDeep] = tx.moveCall({
+    target: "0x2::coin::zero",
+    typeArguments: [DEEP_COIN],
+  });
+
+  const [baseCoin, quoteCoin, deepCoin] = tx.moveCall({
     target: `${DEEPBOOK_PACKAGE_ID}::pool::swap_exact_quote_for_base`,
     typeArguments: [pool.baseType, pool.quoteType],
     arguments: [
       tx.object(pool.poolId),
       coinIn,
+      zeroDeep,
       tx.pure.u64(minOut),
       tx.object(CLOCK_ID),
     ],
   });
 
+  tx.transferObjects([baseCoin, quoteCoin, deepCoin], tx.pure.address(recipient));
+
   return tx;
 }
 
 /**
- * Build a swap transaction based on the direction.
- * @param pool - Pool option
- * @param sellAmount - Amount to sell (smallest unit)
- * @param minBuyAmount - Minimum to receive (smallest unit)
- * @param sellBase - If true, sell BASE to buy QUOTE. If false, sell QUOTE to buy BASE.
+ * Build a swap transaction for any pool + direction.
+ *
+ * @param pool        The pool configuration
+ * @param sellAmount  Amount to sell (smallest unit)
+ * @param minBuyAmount  Minimum to receive (slippage, smallest unit)
+ * @param sellBase    true: sell BASE → buy QUOTE; false: sell QUOTE → buy BASE
+ * @param recipient   Address to receive the output coins
+ * @param coinObjectId  Optional explicit coin object ID
  */
 export function buildSwapTx(
   pool: PoolOption,
   sellAmount: bigint,
   minBuyAmount: bigint,
   sellBase: boolean,
+  recipient: string,
+  coinObjectId?: string,
 ): Transaction {
   if (sellBase) {
-    return buildSwapExactBaseForQuote(pool, sellAmount, minBuyAmount);
+    return buildSwapExactBaseForQuote(pool, sellAmount, minBuyAmount, recipient, coinObjectId);
   }
-  return buildSwapExactQuoteForBase(pool, sellAmount, minBuyAmount);
+  return buildSwapExactQuoteForBase(pool, sellAmount, minBuyAmount, recipient, coinObjectId);
 }
 
-// ── Live Price Quoting via devInspectTransactionBlock ────────────────
+// ── Live Price Quoting ─────────────────────────────────────────────────
 
 /**
  * Simulate a swap via devInspectTransactionBlock to get the real expected output.
  *
- * @param suiClient - A SuiClient instance
- * @param sender - The wallet address (used as sender for simulation)
- * @param pool - The pool to swap on
- * @param sellAmount - Amount to sell (smallest unit)
- * @param sellBase - true: sell BASE→QUOTE; false: sell QUOTE→BASE
- * @returns The expected output amount (smallest unit), or 0n if simulation fails
+ * Uses the gas coin for simulation (devInspect doesn't execute, so the
+ * coin type mismatch is irrelevant — it's only checking the return value).
  */
 export async function getSwapQuote(
   suiClient: { devInspectTransactionBlock: (args: any) => Promise<any> },
@@ -197,35 +309,44 @@ export async function getSwapQuote(
   sellBase: boolean,
 ): Promise<bigint> {
   try {
-    const tx = buildSwapTx(pool, sellAmount, 0n, sellBase);
+    const tx = new Transaction();
+    const target = sellBase 
+      ? `${DEEPBOOK_PACKAGE_ID}::pool::get_quote_quantity_out`
+      : `${DEEPBOOK_PACKAGE_ID}::pool::get_base_quantity_out`;
+      
+    tx.moveCall({
+      target,
+      typeArguments: [pool.baseType, pool.quoteType],
+      arguments: [
+        tx.object(pool.poolId),
+        tx.pure.u64(sellAmount),
+        tx.object(CLOCK_ID),
+      ],
+    });
 
     const result = await suiClient.devInspectTransactionBlock({
       sender,
       transactionBlock: tx,
     });
 
-    // Determine which coin type is the buy asset
-    const buyCoinType = sellBase ? pool.quoteType : pool.baseType;
-
-    // Parse balanceChanges to find the buy asset amount change
-    // The buy asset should have a positive balance change (we receive it)
-    for (const bc of result.balanceChanges ?? []) {
-      if (bc.coinType === buyCoinType) {
-        const amount = BigInt(bc.amount);
-        if (amount > 0n) return amount;
-      }
+    if (result.error) {
+      console.warn("Quote simulation failed:", result.error);
+      return 0n;
     }
 
-    // Fallback: check all balance changes for any positive amount
-    // (in case the coin type string doesn't match exactly)
-    for (const bc of result.balanceChanges ?? []) {
-      const amount = BigInt(bc.amount);
-      if (amount > 0n) return amount;
+    if (!result.results || result.results.length === 0 || !result.results[0].returnValues) {
+      return 0n;
     }
 
-    return 0n;
-  } catch (err) {
-    console.warn("Swap quote simulation failed:", err);
+    const bytes = result.results[0].returnValues[0][0];
+    let amount = 0n;
+    for (let i = 0; i < bytes.length; i++) {
+      amount += BigInt(bytes[i]) << BigInt(i * 8);
+    }
+    
+    return amount;
+  } catch (error) {
+    console.error("Swap quote failed:", error);
     return 0n;
   }
 }
@@ -254,5 +375,3 @@ export function formatAmount(value: bigint, decimals: number): string {
   if (!fractionStr) return whole.toString();
   return `${whole}.${fractionStr}`;
 }
-
-

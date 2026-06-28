@@ -5,4 +5,5 @@ export interface SponsorTxRequestBody {
   txBytes: string;
   sender: string;
   allowedAddresses?: string[];
+  allowedMoveCallTargets?: string[];
 }

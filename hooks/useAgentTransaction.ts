@@ -2,14 +2,7 @@ import clientConfig from "@/config/clientConfig";
 import { useCustomWallet } from "@/contexts/CustomWallet";
 import { SuiTransactionBlockResponse } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
-
-/** Sui Clock shared object ID (same on all networks) */
-const CLOCK_ID = "0x6";
-
-/** GhostPayState shared object — created during publish */
-const GHOSTPAY_STATE_ID =
-  process.env.NEXT_PUBLIC_GHOSTPAY_STATE_ID ||
-  "0x6c7c1188cd3299591b4ef7f69156a8c2a96982babffb5043007a91a7adca9c1a";
+import { CLOCK_ID, GHOSTPAY_STATE_ID } from "@/lib/constants";
 
 export function useAgentTransaction() {
   const { sponsorAndExecuteTransactionBlock, address } = useCustomWallet();
@@ -20,7 +13,7 @@ export function useAgentTransaction() {
   ): Promise<SuiTransactionBlockResponse> => {
     const txb = new Transaction();
 
-    txb.moveCall({
+    const [agent] = txb.moveCall({
       target: `${clientConfig.PACKAGE_ID}::agent::create_agent`,
       arguments: [
         txb.pure.string(name),
@@ -30,11 +23,15 @@ export function useAgentTransaction() {
       ],
     });
 
+    txb.transferObjects([agent], address!);
+
+
     return sponsorAndExecuteTransactionBlock({
       tx: txb,
       network: clientConfig.SUI_NETWORK_NAME,
       includesTransferTx: true,
       allowedAddresses: [address!],
+      allowedMoveCallTargets: [`${clientConfig.PACKAGE_ID}::agent::create_agent`],
       options: {
         showEffects: true,
         showObjectChanges: true,
@@ -58,6 +55,7 @@ export function useAgentTransaction() {
       network: clientConfig.SUI_NETWORK_NAME,
       includesTransferTx: true,
       allowedAddresses: [address!],
+      allowedMoveCallTargets: [`${clientConfig.PACKAGE_ID}::agent::update_display_name`],
       options: {
         showEffects: true,
         showObjectChanges: true,
@@ -80,6 +78,7 @@ export function useAgentTransaction() {
       network: clientConfig.SUI_NETWORK_NAME,
       includesTransferTx: true,
       allowedAddresses: [address!],
+      allowedMoveCallTargets: [`${clientConfig.PACKAGE_ID}::agent::deactivate_agent`],
       options: {
         showEffects: true,
         showObjectChanges: true,
@@ -109,6 +108,7 @@ export function useAgentTransaction() {
       network: clientConfig.SUI_NETWORK_NAME,
       includesTransferTx: true,
       allowedAddresses: [address!],
+      allowedMoveCallTargets: [`${clientConfig.PACKAGE_ID}::agent::grant_capability`],
       options: {
         showEffects: true,
         showObjectChanges: true,

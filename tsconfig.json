@@ -38,6 +38,8 @@
   ],
   "exclude": [
     "node_modules",
-    "app/landing"
+    "app/landing",
+    "hepler repo",
+    "invisible-auth"
   ]
 }

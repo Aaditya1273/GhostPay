@@ -18,18 +18,21 @@ import {
 } from "@mysten/seal";
 import type { SuiClient } from "@mysten/sui/client";
 import type { Signer } from "@mysten/sui/cryptography";
+import {
+  SEAL_PACKAGE_ID,
+  SEAL_KEY_SERVER_OBJECT_ID,
+  SEAL_AGGREGATOR_URL,
+} from "@/lib/constants";
 
 // ── Well-known SEAL configs ──────────────────────────────────────────────
 
-const TESTNET_SEAL_PACKAGE_ID =
-  "0xdccbeb87767be2b2346af5575eb139807205e4c23ec53dc616f951fe1d814112";
+const TESTNET_SEAL_PACKAGE_ID = SEAL_PACKAGE_ID;
 
 const TESTNET_KEY_SERVERS: KeyServerConfig[] = [
   {
-    objectId:
-      "0xb012378c9f3799fb5b1a7083da74a4069e3c3f1c93de0b27212a5799ce1e1e98",
+    objectId: SEAL_KEY_SERVER_OBJECT_ID,
     weight: 1,
-    aggregatorUrl: "https://seal-aggregator-testnet.mystenlabs.com",
+    aggregatorUrl: SEAL_AGGREGATOR_URL,
   },
 ];
 
@@ -156,7 +159,7 @@ function createSealClient(config: SealServiceConfig): SealClient {
   const options: SealClientOptions = {
     suiClient: config.suiClient as any,
     serverConfigs: config.keyServers ?? TESTNET_KEY_SERVERS,
-    verifyKeyServers: false,
+    verifyKeyServers: true,
   };
 
   return new SealClient(options);

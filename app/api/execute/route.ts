@@ -1,35 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enokiClient } from "../EnokiClient";
-import { ExecuteSponsoredTransactionApiInput } from "@/contexts/CustomWallet";
+import {
+  executeTxSchema,
+  runExecuteSecurityChecks,
+  sanitizeErrorMessage,
+} from "@/lib/security";
 
 export const POST = async (request: NextRequest) => {
-  const { digest, signature }: ExecuteSponsoredTransactionApiInput =
-    await request.json();
+  try {
+    // ── 1. Parse and validate request body with Zod ────────────────
+    const rawBody = await request.json();
+    const parseResult = executeTxSchema.safeParse(rawBody);
 
-  return enokiClient
-    .executeSponsoredTransaction({
-      digest,
-      signature,
-    })
-    .then(({ digest }) => {
+    if (!parseResult.success) {
+      const firstError = parseResult.error.errors[0];
       return NextResponse.json(
-        { digest },
-        {
-          status: 200,
-        }
+        { error: `Validation error: ${firstError.message}` },
+        { status: 400 },
       );
-    })
-    .catch((error) => {
-      console.error(error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Could not execute sponsored transaction block.";
+    }
+
+    const body = parseResult.data;
+
+    // ── 2. Extract JWT from Authorization header ────────────────────
+    const authHeader = request.headers.get("authorization");
+    const jwt = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+    // ── 3. Run all security checks ──────────────────────────────────
+    const security = runExecuteSecurityChecks(request, body, jwt);
+
+    if (!security.passed) {
+      const headers: Record<string, string> = {};
+      if (security.headers) {
+        Object.assign(headers, security.headers);
+      }
       return NextResponse.json(
-        { error: message },
-        {
-          status: 500,
-        }
+        { error: security.error },
+        { status: security.status, headers },
       );
+    }
+
+    // ── 4. Execute the sponsored transaction ────────────────────────
+    const result = await enokiClient.executeSponsoredTransaction({
+      digest: body.digest,
+      signature: body.signature,
     });
+
+    const responseHeaders: Record<string, string> = {};
+    if (security.headers) {
+      Object.assign(responseHeaders, security.headers);
+    }
+
+    return NextResponse.json(
+      { digest: result.digest },
+      { status: 200, headers: responseHeaders },
+    );
+  } catch (error) {
+    console.error("Execute error:", error);
+    const message = sanitizeErrorMessage(error);
+    return NextResponse.json(
+      { error: message },
+      { status: 500 },
+    );
+  }
 };

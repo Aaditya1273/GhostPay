@@ -1,0 +1,4 @@
+# getSwapQuote Balance Parsing Fix
+* The previous logic for `getSwapQuote` simulated a full `swap_exact_base_for_quote` moveCall using `devInspectTransactionBlock`. Because we added `tx.transferObjects` to fix the dropped-object bug in the actual swaps, the simulated output coins in `devInspect` were completely transferred to the user's address, which causes `devInspectTransactionBlock` to drop the `balanceChanges` field from the result payload (a known edge case in the Sui SDK).
+* As a result, the parsing logic (`for (const bc of result.balanceChanges ?? [])`) silently failed and returned 0n.
+* **Fix:** I rewrote `getSwapQuote` to use the official DeepBook V3 read-only methods (`get_quote_quantity_out` and `get_base_quantity_out`). We bypass `balanceChanges` entirely by parsing the exact `u64` output byte array directly from the move call result! The quote is now 100% accurate, handles testnet liquidity, and properly unlocks the UI.

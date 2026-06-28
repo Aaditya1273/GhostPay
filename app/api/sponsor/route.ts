@@ -1,47 +1,88 @@
-import { SponsorTxRequestBody } from "@/types/SponsorTx";
+import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { enokiClient } from "../EnokiClient";
-
-/*
- - Right now any txBlock whose moveCall targets are whitelisted in the Enoki Portal can be sponsored
- - In mainnet products, we will probably want to add constraints, such as:
-  - require a JWT token if the user is signed in with Enoki
-  - require a signed message if the user uses wallet-kit
-  - require that the number of commands in the txBlock is exactly one, we can check this via `TransactionBlock.from(txBytes)`
-  - require that the allowedAddresses only contain the sender's address (in case of an airdrop)
-*/
+import {
+  sponsorTxSchema,
+  runSponsorSecurityChecks,
+  sanitizeErrorMessage,
+  clearReplayNonce,
+} from "@/lib/security";
 
 export const POST = async (request: NextRequest) => {
-  const { network, txBytes, sender, allowedAddresses, allowedMoveCallTargets }: SponsorTxRequestBody =
-    await request.json();
+  let usedNonce: string | undefined;
 
-  return enokiClient
-    .createSponsoredTransaction({
-      network,
-      transactionKindBytes: txBytes,
-      sender,
-      allowedAddresses,
-      // Only restrict targets when the caller explicitly provides them.
-      // When undefined, the Enoki Portal's API key configuration handles
-      // the allowlist (needed for GhostPay's own contracts to work).
-      allowedMoveCallTargets,
-    })
-    .then((resp) => {
-      return NextResponse.json(resp, {
-        status: 200,
-      });
-    })
-    .catch((error) => {
-      console.error(error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Could not create sponsored transaction block.";
+  try {
+    // ── 1. Parse and validate request body with Zod ────────────────
+    const rawBody = await request.json();
+    const parseResult = sponsorTxSchema.safeParse(rawBody);
+
+    if (!parseResult.success) {
+      const firstError = parseResult.error.errors[0];
       return NextResponse.json(
-        { error: message },
-        {
-          status: 500,
-        }
+        { error: `Validation error: ${firstError.message}` },
+        { status: 400 },
       );
+    }
+
+    const body = parseResult.data;
+
+    // ── 2. Extract JWT from Authorization header ────────────────────
+    const authHeader = request.headers.get("authorization");
+    const jwt = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+    // ── 3. Run all security checks ──────────────────────────────────
+    const security = runSponsorSecurityChecks(request, body, jwt);
+
+    if (!security.passed) {
+      const headers: Record<string, string> = {};
+      if (security.headers) {
+        Object.assign(headers, security.headers);
+      }
+      return NextResponse.json(
+        { error: security.error },
+        { status: security.status, headers },
+      );
+    }
+
+    // Save the nonce so we can clear it if the upstream request fails
+    usedNonce = security.nonce;
+
+    // ── 4. Forward to Enoki ─────────────────────────────────────────
+    const resp = await enokiClient.createSponsoredTransaction({
+      network: body.network,
+      transactionKindBytes: body.txBytes,
+      sender: body.sender,
+      allowedAddresses: body.allowedAddresses,
+      allowedMoveCallTargets: body.allowedMoveCallTargets,
     });
+
+    const responseHeaders: Record<string, string> = {};
+    if (security.headers) {
+      Object.assign(responseHeaders, security.headers);
+    }
+
+    return NextResponse.json(resp, {
+      status: 200,
+      headers: responseHeaders,
+    });
+  } catch (error) {
+    if (usedNonce) {
+      clearReplayNonce(usedNonce);
+    }
+
+    console.error("Sponsor error:", error);
+    let detailedMessage = sanitizeErrorMessage(error);
+    
+    const enokiErrors = (error && typeof error === "object" && "errors" in error)
+      ? (error as any).errors
+      : null;
+
+    return NextResponse.json(
+      { 
+        error: detailedMessage,
+        ...(enokiErrors && { enokiErrors }) // surface upstream error in dev
+      },
+      { status: 502 }, // 502 = upstream rejected, more accurate than 500
+    );
+  }
 };

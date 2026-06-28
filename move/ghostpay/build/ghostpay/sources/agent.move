@@ -184,13 +184,13 @@ module ghostpay::agent {
     }
 
     /// Increment payment sequence (called by payment module).
-    public fun increment_payment_seq(agent: &mut Agent): u64 {
+    public(package) fun increment_payment_seq(agent: &mut Agent): u64 {
         agent.payment_seq = agent.payment_seq + 1;
         agent.payment_seq
     }
 
     /// Increment memory sequence (called by memory module).
-    public fun increment_memory_seq(agent: &mut Agent): u64 {
+    public(package) fun increment_memory_seq(agent: &mut Agent): u64 {
         agent.memory_seq = agent.memory_seq + 1;
         agent.memory_seq
     }

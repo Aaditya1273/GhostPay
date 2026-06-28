@@ -37,7 +37,6 @@ export function usePaymentReceiptsQuery() {
     },
     {
       enabled: isPackageDeployed && !!address,
-      refetchInterval: 15_000,
     }
   );
 }

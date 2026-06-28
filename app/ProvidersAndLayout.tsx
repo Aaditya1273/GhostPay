@@ -22,6 +22,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { RemittanceEngineWrapper } from "@/components/RemittanceEngineWrapper";
 import { GhostPayEventIndexer } from "@/components/GhostPayEventIndexer";
 import { AgentEngineWrapper } from "@/components/AgentEngineWrapper";
+import { IncomingFundDetector } from "@/components/IncomingFundDetector";
 
 export interface StorageAdapter {
   setItem(key: string, value: string): Promise<void>;
@@ -79,13 +80,13 @@ export const ProvidersAndLayout = ({ children }: ChildrenProps) => {
                   attribute="class"
                   defaultTheme="dark"
                   enableSystem={false}
-                  disableTransitionOnChange
                 >
                   <main>
                     <GhostPayEventIndexer />
-          <RemittanceEngineWrapper />
-          <AgentEngineWrapper />
-          {children}
+                    <RemittanceEngineWrapper />
+                    <AgentEngineWrapper />
+                    <IncomingFundDetector />
+                    {children}
                     <Toaster duration={2000} />
                     <Analytics />
                   </main>

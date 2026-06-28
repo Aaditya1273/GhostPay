@@ -12,8 +12,54 @@
  * @mysten/walrus SDK with SuiGrpcClient + signer for full on-chain registration.
  */
 
-const PUBLISHER_URL = "https://publisher.walrus-testnet.walrus.space";
-const AGGREGATOR_URL = "https://aggregator.walrus-testnet.walrus.space";
+import { WALRUS_PUBLISHER_URL, WALRUS_AGGREGATOR_URL } from "@/lib/constants";
+
+const PUBLISHER_URL = WALRUS_PUBLISHER_URL;
+const AGGREGATOR_URL = WALRUS_AGGREGATOR_URL;
+
+// ── Retry helper ────────────────────────────────────────────────────────
+
+/** Default retry config: 3 attempts, 1s initial backoff, 2x multiplier */
+interface RetryConfig {
+  maxAttempts: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+}
+
+const DEFAULT_RETRY: RetryConfig = {
+  maxAttempts: 3,
+  baseDelayMs: 1_000,
+  maxDelayMs: 10_000,
+};
+
+/**
+ * Execute an async function with exponential backoff retry.
+ * Only retries on network errors and 5xx server errors (not 4xx client errors).
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  config: RetryConfig = DEFAULT_RETRY,
+  attempt: number = 1,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    // Don't retry 4xx client errors (bad request, not found, etc.)
+    if (err instanceof Error && /4\d\d/.test(err.message)) {
+      throw err;
+    }
+    if (attempt >= config.maxAttempts) {
+      throw err;
+    }
+    // Exponential backoff with jitter
+    const delay = Math.min(
+      config.baseDelayMs * Math.pow(2, attempt - 1) * (0.5 + Math.random() * 0.5),
+      config.maxDelayMs,
+    );
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    return withRetry(fn, config, attempt + 1);
+  }
+}
 
 export interface WalrusUploadResult {
   blobId: string;
@@ -44,38 +90,40 @@ export async function uploadToWalrus(
 ): Promise<WalrusUploadResult> {
   const url = `${PUBLISHER_URL}/v1/blobs?epochs=${epochs}&deletable=${deletable}`;
 
-  const body = data instanceof Blob ? data : new Blob([data as BlobPart]);
-  const response = await fetch(url, {
-    method: "PUT",
-    body,
+  return withRetry(async () => {
+    const body = data instanceof Blob ? data : new Blob([data as BlobPart]);
+    const response = await fetch(url, {
+      method: "PUT",
+      body,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Walrus upload failed (${response.status}): ${text}`);
+    }
+
+    const result = await response.json();
+
+    // Response can be either newlyCreated or alreadyCertified
+    if (result.newlyCreated) {
+      return {
+        blobId: result.newlyCreated.blobObject.blobId,
+        blobObjectId: result.newlyCreated.blobObject.id,
+        storedForEpoch: result.newlyCreated.blobObject.storage?.endEpoch,
+      };
+    }
+
+    if (result.alreadyCertified) {
+      return {
+        blobId: result.alreadyCertified.blobId,
+      };
+    }
+
+    // Fallback for other response shapes
+    return {
+      blobId: result.blobId,
+    };
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Walrus upload failed (${response.status}): ${text}`);
-  }
-
-  const result = await response.json();
-
-  // Response can be either newlyCreated or alreadyCertified
-  if (result.newlyCreated) {
-    return {
-      blobId: result.newlyCreated.blobObject.blobId,
-      blobObjectId: result.newlyCreated.blobObject.id,
-      storedForEpoch: result.newlyCreated.blobObject.storage?.endEpoch,
-    };
-  }
-
-  if (result.alreadyCertified) {
-    return {
-      blobId: result.alreadyCertified.blobId,
-    };
-  }
-
-  // Fallback for other response shapes
-  return {
-    blobId: result.blobId,
-  };
 }
 
 /**
@@ -87,20 +135,22 @@ export async function downloadFromWalrus(
 ): Promise<{ data: Uint8Array; contentType: string }> {
   const url = `${AGGREGATOR_URL}/v1/blobs/${blobId}`;
 
-  const response = await fetch(url);
+  return withRetry(async () => {
+    const response = await fetch(url);
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Walrus download failed (${response.status}): ${text}`);
-  }
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Walrus download failed (${response.status}): ${text}`);
+    }
 
-  const contentType = response.headers.get("content-type") || "application/octet-stream";
-  const buffer = await response.arrayBuffer();
+    const contentType = response.headers.get("content-type") || "application/octet-stream";
+    const buffer = await response.arrayBuffer();
 
-  return {
-    data: new Uint8Array(buffer),
-    contentType,
-  };
+    return {
+      data: new Uint8Array(buffer),
+      contentType,
+    };
+  });
 }
 
 /**

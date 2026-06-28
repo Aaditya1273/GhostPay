@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useCustomWallet } from "@/contexts/CustomWallet";
 import { useAgent } from "@/hooks/useAgentQuery";
 import { useAgentTransaction } from "@/hooks/useAgentTransaction";
@@ -20,12 +20,14 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import clientConfig from "@/config/clientConfig";
 import { toast } from "sonner";
+import { useLoadingDeadlock } from "@/lib/demoProof";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -53,21 +55,33 @@ async function sha256Hex(input: string): Promise<string> {
 }
 
 export default function DashboardPage() {
-  const { isUsingEnoki, address, emailAddress } = useCustomWallet();
-  const { fields: agent, hasAgent, isPending: agentLoading } = useAgent();
-  const { createAgent } = useAgentTransaction();
+  const { isUsingEnoki, address, emailAddress, authLoading } = useCustomWallet();
+  const { fields: agent, agentId, hasAgent, isPending: agentLoading, refetch: refetchAgent } = useAgent();
+  const { createAgent, deactivateAgent } = useAgentTransaction();
   const { payments } = usePayments();
 
-  // ── Create Agent state ───────────────────────────────────────────────
+  // ── Create / Deactivate Agent state ─────────────────────────────────────
   const [agentName, setAgentName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // ── Loading deadlock protection ──────────────────────────────────────
+  const { timedOut: createTimedOut } = useLoadingDeadlock(creating);
+  const isSubmittingAgent = useRef(false);
 
   const handleCreateAgent = useCallback(async () => {
+    if (isSubmittingAgent.current) return;
     const name = (agentName || emailAddress?.split("@")[0] || "My Agent").trim();
     if (!name) {
       toast.error("Enter an agent name");
       return;
     }
+    isSubmittingAgent.current = true;
     setCreating(true);
     try {
       const emailHash = emailAddress ? await sha256Hex(emailAddress) : "";
@@ -76,16 +90,70 @@ export default function DashboardPage() {
       if (status === "failure") {
         throw new Error(result.effects?.status?.error || "Transaction failed");
       }
-      toast.success(`Agent "${name}" created on-chain!`);
-      // The query auto-refreshes every 10 s via refetchInterval,
-      // so the dashboard will pick up the new Agent automatically.
+      
+      const digest = result.digest;
+      const explorerLink = `https://suivision.xyz/txblock/${digest}?network=${clientConfig.SUI_NETWORK_NAME}`;
+      
+      toast.success(
+        <div className="flex flex-col gap-1">
+          <span>Agent "{name}" created successfully!</span>
+          <a 
+            href={explorerLink} 
+            target="_blank" 
+            rel="noreferrer"
+            className="text-xs text-blue-500 hover:underline flex items-center gap-1"
+          >
+            View on SuiVision <ArrowUpRight className="w-3 h-3" />
+          </a>
+        </div>,
+        { duration: 6000 }
+      );
+      
+      setAgentName(""); // Reset input
+      await refetchAgent(); // Immediately refresh UI so the modal closes
     } catch (err: any) {
       const msg = err?.message || "Failed to create agent";
       toast.error(msg);
     } finally {
       setCreating(false);
+      isSubmittingAgent.current = false;
     }
   }, [agentName, emailAddress, createAgent]);
+
+  const isDeactivatingAgent = useRef(false);
+  const handleDeactivateAgent = useCallback(async () => {
+    if (isDeactivatingAgent.current || !agentId) return;
+    isDeactivatingAgent.current = true;
+    setDeactivating(true);
+    try {
+      const result = await deactivateAgent(agentId);
+      const status = result.effects?.status?.status;
+      if (status === "failure") {
+        throw new Error(result.effects?.status?.error || "Deactivation failed");
+      }
+      const digest = result.digest;
+      toast.success(
+        <div className="flex flex-col gap-1">
+          <span>Agent deactivated successfully!</span>
+          <a
+            href={`https://testnet.suivision.xyz/txblock/${digest}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-blue-500 hover:underline flex items-center gap-1"
+          >
+            View on SuiVision <ArrowUpRight className="w-3 h-3" />
+          </a>
+        </div>,
+        { duration: 6000 }
+      );
+      await refetchAgent();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to deactivate agent");
+    } finally {
+      setDeactivating(false);
+      isDeactivatingAgent.current = false;
+    }
+  }, [agentId, deactivateAgent, refetchAgent]);
 
   const showCreateAgent = isUsingEnoki && !hasAgent && !agentLoading && !creating;
 
@@ -152,6 +220,18 @@ export default function DashboardPage() {
     status: p.status,
   }));
 
+  if (!mounted) {
+    return (
+      <LayoutShell>
+        <div className="p-4 lg:p-8 pb-24 lg:pb-8 max-w-7xl mx-auto flex justify-center items-center h-full min-h-[50vh]">
+          <div className="animate-pulse flex items-center justify-center w-16 h-16 rounded-2xl bg-[rgba(179,71,255,0.1)]">
+            <Ghost className="w-8 h-8 text-[#B347FF]" />
+          </div>
+        </div>
+      </LayoutShell>
+    );
+  }
+
   return (
     <LayoutShell>
       <div className="p-4 lg:p-8 pb-24 lg:pb-8 max-w-7xl mx-auto">
@@ -206,7 +286,9 @@ export default function DashboardPage() {
             <div className="text-center max-w-md">
               <h2 className="text-xl font-semibold mb-2 text-[#F4F6FF]">Creating Agent…</h2>
               <p className="text-[#A7B0C8]">
-                Submitting transaction to Sui Testnet. This should confirm in a few seconds.
+                {createTimedOut
+                  ? "This is taking longer than expected. The transaction may still confirm — check Sui Explorer or refresh the page."
+                  : "Submitting transaction to Sui Testnet. This should confirm in a few seconds."}
               </p>
             </div>
           </motion.div>
@@ -451,6 +533,23 @@ export default function DashboardPage() {
                         </div>
                       ))}
                     </div>
+                    {/* Deactivate Agent */}
+                    {isPackageDeployed && hasAgent && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="w-full mt-2 gap-2 opacity-70 hover:opacity-100"
+                        onClick={handleDeactivateAgent}
+                        disabled={deactivating}
+                      >
+                        {deactivating ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3 h-3" />
+                        )}
+                        {deactivating ? "Deactivating…" : "Deactivate Agent"}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </motion.div>

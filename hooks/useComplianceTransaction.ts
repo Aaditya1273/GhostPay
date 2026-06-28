@@ -2,13 +2,17 @@ import clientConfig from "@/config/clientConfig";
 import { useCustomWallet } from "@/contexts/CustomWallet";
 import { SuiTransactionBlockResponse } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
-
-/** Sui Clock shared object ID (same on all networks) */
-const CLOCK_ID = "0x6";
+import { CLOCK_ID } from "@/lib/constants";
 
 export function useComplianceTransaction() {
   const { sponsorAndExecuteTransactionBlock, address } = useCustomWallet();
 
+  /**
+   * Create a view-key on-chain that grants a viewer access to decrypt
+   * SEAL-encrypted Walrus blobs owned by this agent.
+   *
+   * create_view_key returns a ViewKey object — must be transferred.
+   */
   const createViewKey = async (
     agentId: string,
     viewer: string,
@@ -17,7 +21,7 @@ export function useComplianceTransaction() {
   ): Promise<SuiTransactionBlockResponse> => {
     const txb = new Transaction();
 
-    txb.moveCall({
+    const [viewKey] = txb.moveCall({
       target: `${clientConfig.PACKAGE_ID}::compliance::create_view_key`,
       arguments: [
         txb.object(agentId),
@@ -28,11 +32,15 @@ export function useComplianceTransaction() {
       ],
     });
 
+    // Transfer ViewKey to the viewer so they can hold it for decryption
+    txb.transferObjects([viewKey], txb.pure.address(viewer));
+
     return sponsorAndExecuteTransactionBlock({
       tx: txb,
       network: clientConfig.SUI_NETWORK_NAME,
       includesTransferTx: true,
-      allowedAddresses: [address!],
+      allowedAddresses: [address!, viewer],
+      allowedMoveCallTargets: [`${clientConfig.PACKAGE_ID}::compliance::create_view_key`],
       options: {
         showEffects: true,
         showObjectChanges: true,
@@ -41,13 +49,17 @@ export function useComplianceTransaction() {
   };
 
   const revokeViewKey = async (
-    viewKeyId: string
+    viewKeyId: string,
+    agentId: string
   ): Promise<SuiTransactionBlockResponse> => {
     const txb = new Transaction();
 
     txb.moveCall({
       target: `${clientConfig.PACKAGE_ID}::compliance::revoke_view_key`,
-      arguments: [txb.object(viewKeyId)],
+      arguments: [
+        txb.object(viewKeyId),
+        txb.object(agentId),
+      ],
     });
 
     return sponsorAndExecuteTransactionBlock({
@@ -55,6 +67,7 @@ export function useComplianceTransaction() {
       network: clientConfig.SUI_NETWORK_NAME,
       includesTransferTx: true,
       allowedAddresses: [address!],
+      allowedMoveCallTargets: [`${clientConfig.PACKAGE_ID}::compliance::revoke_view_key`],
       options: {
         showEffects: true,
         showObjectChanges: true,
@@ -62,6 +75,10 @@ export function useComplianceTransaction() {
     });
   };
 
+  /**
+   * Log an access event on-chain for audit trail.
+   * log_access returns an AccessLogEntry — must be transferred.
+   */
   const logAccess = async (
     agentId: string,
     viewer: string,
@@ -70,7 +87,7 @@ export function useComplianceTransaction() {
   ): Promise<SuiTransactionBlockResponse> => {
     const txb = new Transaction();
 
-    txb.moveCall({
+    const [logEntry] = txb.moveCall({
       target: `${clientConfig.PACKAGE_ID}::compliance::log_access`,
       arguments: [
         txb.object(agentId),
@@ -81,11 +98,15 @@ export function useComplianceTransaction() {
       ],
     });
 
+    // Transfer the log entry to the agent owner for their records
+    txb.transferObjects([logEntry], txb.pure.address(address!));
+
     return sponsorAndExecuteTransactionBlock({
       tx: txb,
       network: clientConfig.SUI_NETWORK_NAME,
       includesTransferTx: true,
       allowedAddresses: [address!],
+      allowedMoveCallTargets: [`${clientConfig.PACKAGE_ID}::compliance::log_access`],
       options: {
         showEffects: true,
         showObjectChanges: true,

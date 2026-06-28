@@ -16,6 +16,8 @@ import {
   X,
   Ghost,
   LogOut,
+  AlertTriangle,
+  WifiOff,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -24,6 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useCustomWallet } from "@/contexts/CustomWallet";
 import { motion, AnimatePresence } from "framer-motion";
+import { DemoErrorBoundary, useNetworkStatus } from "@/lib/demoProof";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -47,8 +50,14 @@ const itemVariants = {
 export default function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { isConnected, logout, redirectToAuthUrl, emailAddress, address, isUsingEnoki } = useCustomWallet();
+  const { online } = useNetworkStatus();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -111,7 +120,9 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
                 })}
               </nav>
               <div className="p-4 border-t border-sidebar-border">
-                {isConnected ? (
+                {!mounted ? (
+                  <div className="h-[44px]" />
+                ) : isConnected ? (
                   isUsingEnoki ? (
                     <Popover>
                       <PopoverTrigger asChild>
@@ -234,7 +245,9 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
           "p-3",
           sidebarOpen ? "" : "flex justify-center"
         )}>
-          {isConnected ? (
+          {!mounted ? (
+            <div className="h-[44px]" />
+          ) : isConnected ? (
             sidebarOpen ? (
               isUsingEnoki ? (
                 <Popover>
@@ -344,7 +357,9 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
           <div className="flex-1" />
 
           <div className="flex items-center gap-2">
-            {isConnected ? (
+            {!mounted ? (
+              <div className="h-9 w-24" />
+            ) : isConnected ? (
               <>
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.05)] text-sm text-[#A7B0C8]">
                   <span className="w-2 h-2 rounded-full bg-[#B347FF]" />
@@ -421,10 +436,20 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
           </div>
         </header>
 
+        {/* Offline Banner */}
+        {!online && (
+          <div className="flex items-center justify-center gap-2 px-4 py-2 bg-destructive/90 backdrop-blur-sm text-destructive-foreground text-sm font-medium">
+            <WifiOff className="w-4 h-4" />
+            You are offline. Transactions will resume when connectivity is restored.
+          </div>
+        )}
+
         {/* Page content */}
         <main className="flex-1 overflow-y-auto bg-[#0B0C10]">
           <div className="animate-page-in">
-            {children}
+            <DemoErrorBoundary>
+              {children}
+            </DemoErrorBoundary>
           </div>
         </main>
       </div>

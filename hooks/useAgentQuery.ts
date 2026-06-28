@@ -25,14 +25,13 @@ export function useAgentQuery() {
     },
     {
       enabled: isPackageDeployed && !!address,
-      refetchInterval: 10_000,
     }
   );
 }
 
 /** Get the first Agent object from the query */
 export function useAgent() {
-  const { data, isPending, error } = useAgentQuery();
+  const { data, isPending, error, refetch } = useAgentQuery();
 
   const agent = data?.data?.[0]?.data;
   const agentFields = agent?.content as
@@ -56,6 +55,7 @@ export function useAgent() {
     fields: agentFields?.fields,
     isPending,
     error,
+    refetch,
     hasAgent: !!agent,
   };
 }

@@ -26,20 +26,21 @@ import {
   Send,
   ChevronDown,
 } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import clientConfig from "@/config/clientConfig";
+import { useLoadingDeadlock } from "@/lib/demoProof";
 
 const isPackageDeployed =
   !!(clientConfig.PACKAGE_ID && clientConfig.PACKAGE_ID !== "0x0");
 
 export default function WalletPage() {
-  const { isUsingEnoki, address, emailAddress, redirectToAuthUrl } = useCustomWallet();
-  const { fields: agent, hasAgent, agentId } = useAgent();
+  const { isUsingEnoki, address, emailAddress, redirectToAuthUrl, authLoading } = useCustomWallet();
+  const { fields: agent, hasAgent, agentId, isPending: agentPending } = useAgent();
   const { payments } = usePayments();
   const { sui: suiBalance, usdc: usdcBalance, isLoading: balanceLoading, refetch: refetchBalances } = useBalances();
   const suiClient = useSuiClient();
@@ -56,6 +57,20 @@ export default function WalletPage() {
 
   // ── Receive Modal state ─────────────────────────────────────────────
   const [showReceiveModal, setShowReceiveModal] = useState(false);
+
+  // ── Loading deadlock protection ──────────────────────────────────────
+  const { timedOut: balanceTimedOut } = useLoadingDeadlock(balanceLoading);
+
+  // ── Escape key handler ────────────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (showSendModal && !sending) { setShowSendModal(false); return; }
+      if (showReceiveModal) { setShowReceiveModal(false); return; }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showSendModal, showReceiveModal, sending]);
 
   const { transferTokens } = usePaymentTransaction();
 
@@ -92,21 +107,19 @@ export default function WalletPage() {
       const coinType =
         sendCurrency === "SUI" ? SUI_COIN : DBUSDC_COIN;
 
-      let coinObjectId: string | undefined;
-
-      if (sendCurrency === "USDC") {
-        // Query for the first USDC coin owned by this address
-        const coins = await suiClient.getCoins({
-          owner: address!,
-          coinType: DBUSDC_COIN,
-        });
-        if (coins.data.length === 0) {
-          throw new Error("No USDC coins found in this wallet");
-        }
-        coinObjectId = coins.data[0].coinObjectId;
+      // Always query for the explicit coin owned by this address.
+      // We cannot use txb.gas for SUI transfers when the transaction is sponsored
+      // because the gas coin belongs to the Enoki sponsor, not the user.
+      const coins = await suiClient.getCoins({
+        owner: address!,
+        coinType: coinType,
+      });
+      if (coins.data.length === 0) {
+        throw new Error(`No ${sendCurrency} coins found in this wallet`);
       }
-      // For SUI, coinObjectId stays undefined — uses gas coin
-
+      // For simplicity, we just take the first coin.
+      // In a robust implementation, we would merge coins if the amount exceeds the first coin's balance.
+      const coinObjectId = coins.data[0].coinObjectId;
       const result = await transferTokens(
         agentId,
         recipient,
@@ -172,8 +185,9 @@ export default function WalletPage() {
               <p className="text-muted-foreground mb-4">
                 Sign in with Google to create your invisible agent wallet instantly.
               </p>
-              <Button onClick={redirectToAuthUrl} size="lg" className="gap-2">
-                Sign in with Google
+              <Button onClick={redirectToAuthUrl} size="lg" className="gap-2" disabled={authLoading}>
+                {authLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {authLoading ? "Redirecting…" : "Sign in with Google"}
               </Button>
             </div>
           </motion.div>
@@ -217,16 +231,19 @@ export default function WalletPage() {
                   <p className="text-xs text-[#A7B0C8] mb-1">Available Balance</p>
                   <div className="flex items-baseline gap-2">
                     <span className="font-heading text-4xl lg:text-5xl font-bold tracking-tight text-[#F4F6FF]">
-                      {balanceLoading ? "—" : suiBalance.toFixed(2)}
+                      {balanceTimedOut ? "—" : balanceLoading ? "—" : suiBalance.toFixed(2)}
                     </span>
                     <span className="text-lg text-[#A7B0C8] font-medium">SUI</span>
                   </div>
                   <div className="flex items-baseline gap-2">
                     <span className="font-heading text-2xl font-bold tracking-tight text-[#A7B0C8]">
-                      {balanceLoading ? "—" : usdcBalance.toFixed(2)}
+                      {balanceTimedOut ? "—" : balanceLoading ? "—" : usdcBalance.toFixed(2)}
                     </span>
                     <span className="text-sm text-[#A7B0C8] font-medium">USDC</span>
                   </div>
+                  {balanceTimedOut && (
+                    <p className="text-xs text-warning mt-1">Balance query taking longer than expected. <button className="underline" onClick={() => refetchBalances()}>Retry</button></p>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-3">
