@@ -72,7 +72,8 @@ export async function encryptWithSeal(
 }> {
   const client = createSealClient(config);
   const servers = config.keyServers ?? TESTNET_KEY_SERVERS;
-  const packageId = config.packageId ?? TESTNET_SEAL_PACKAGE_ID;
+  let packageId = config.packageId ?? TESTNET_SEAL_PACKAGE_ID;
+  if (packageId.startsWith("0x")) packageId = packageId.slice(2);
 
   // Build correct SEAL identity: JUST the policyObjectId, as the SDK handles packageId internally
   const sealId = buildSealId(policyObjectId);
@@ -170,16 +171,48 @@ function getCompatSuiClient(suiClient: any): any {
             }
             if (coreProp === "getDynamicField") {
               return async (args: any) => {
+                // @mysten/seal 1.2.1 sends name.bcs instead of name.value
+                if (args?.name?.bcs) {
+                  args.name.value = args.name.bcs[0].toString();
+                  delete args.name.bcs;
+                }
+
+                // Ensure we request the bcs data
+                args.options = {
+                  ...(args.options || {}),
+                  showBcs: true,
+                };
+
                 // @mysten/seal expects `getDynamicField` but new SDK uses `getDynamicFieldObject`
                 const res = await (coreTarget as any).getDynamicFieldObject(args);
+                
+                if (res && res.data && !res.data.bcs && res.data.objectId) {
+                  const bcsRes = await (coreTarget as any).getObject({
+                    id: res.data.objectId,
+                    options: { showBcs: true }
+                  });
+                  if (bcsRes?.data?.bcs) {
+                    res.data.bcs = bcsRes.data.bcs;
+                  }
+                }
+
                 if (res && res.data) {
                   const bcsBytes = res.data.bcs?.bcsBytes;
+                  // The Sui SDK returns the BCS of the entire `Field<u64, KeyServer>` struct.
+                  // The SEAL SDK (expecting GraphQL behavior) expects ONLY the `value`'s BCS.
+                  // A Field struct has: id (UID, 32 bytes) + name (u64, 8 bytes) = 40 bytes prefix.
+                  let slicedBcs: Uint8Array | undefined = undefined;
+                  if (bcsBytes) {
+                    const fullBytes = fromB64(bcsBytes);
+                    slicedBcs = fullBytes.length > 40 ? fullBytes.slice(40) : fullBytes;
+                  }
+
                   // Preserve decoding here because SEAL SDK parses it via BCS library directly
                   return {
                     ...res,
                     dynamicField: {
                       value: {
-                        bcs: bcsBytes ? fromB64(bcsBytes) : undefined,
+                        bcs: slicedBcs,
                       }
                     }
                   };
@@ -224,9 +257,12 @@ export async function createSessionKey(
 
   const suiClient = getCompatSuiClient(config.suiClient);
 
+  let rawPackageId = packageId ?? TESTNET_SEAL_PACKAGE_ID;
+  if (rawPackageId.startsWith("0x")) rawPackageId = rawPackageId.slice(2);
+
   const sessionKey = await SessionKey.create({
     address,
-    packageId: packageId ?? TESTNET_SEAL_PACKAGE_ID,
+    packageId: rawPackageId,
     ttlMin,
     signer,
     suiClient,
