@@ -54,12 +54,12 @@ export default function Section2Features() {
     >
       {/* Dark minimalist background, no glowing boxes */}
       
-      <div className="relative w-full max-w-[1400px] px-8 md:px-16 flex items-center">
+      <div className="relative w-full max-w-[1900px] px-8 md:px-16 flex items-center">
         <div 
           ref={textRef} 
           className="font-heading font-black text-[10vw] md:text-[7vw] leading-[1.1] tracking-tighter text-[#F4F6FF]"
         >
-          {splitText("A surface built for speed. Type what you want. GhostPay translates your raw intent into instant blockchain transactions. No boxes. No forms. Just action.")}
+          {splitText("Write what you want. GhostPay translates your raw intent into instant blockchain transactions.  No boxes. No forms.        Just action.")}
         </div>
       </div>
     </section>

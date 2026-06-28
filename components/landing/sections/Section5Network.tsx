@@ -22,6 +22,7 @@ export default function Section5Network() {
   const titleRef = useRef<HTMLDivElement>(null);
   const orbitRef = useRef<HTMLDivElement>(null);
   const dotsRef = useRef<(HTMLDivElement | null)[]>([]);
+  const iconRefs = useRef<(SVGSVGElement | null)[]>([]);
   const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
 
   useLayoutEffect(() => {
@@ -45,13 +46,12 @@ export default function Section5Network() {
         }
       );
 
-      // Orbit ring
+      // Orbit ring entrance
       gsap.fromTo(
         orbitRef.current,
-        { scale: 0.9, rotate: -10, opacity: 0 },
+        { scale: 0.9, opacity: 0 },
         {
           scale: 1,
-          rotate: 0,
           opacity: 1,
           scrollTrigger: {
             trigger: orbitRef.current,
@@ -61,6 +61,41 @@ export default function Section5Network() {
           },
         }
       );
+
+      // Orbit ring continuous rotation
+      gsap.fromTo(
+        orbitRef.current,
+        { rotate: -45 },
+        {
+          rotate: 45,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: section,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: 1.5,
+          },
+        }
+      );
+
+      // Counter-rotate the icons to keep them upright
+      iconRefs.current.forEach((icon) => {
+        if (!icon) return;
+        gsap.fromTo(
+          icon,
+          { rotate: 45 },
+          {
+            rotate: -45,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: section,
+              start: 'top bottom',
+              end: 'bottom top',
+              scrub: 1.5,
+            },
+          }
+        );
+      });
 
       // Orbit dots - radial outward stagger
       dotsRef.current.forEach((dot, i) => {
@@ -130,52 +165,55 @@ export default function Section5Network() {
 
         {/* Orbit visualization */}
         <div className="flex justify-center mb-12 md:mb-16">
-          <div
-            ref={orbitRef}
-            className="relative w-[280px] h-[280px] md:w-[360px] md:h-[360px] opacity-0"
-          >
-            {/* Orbit ring */}
-            <svg
-              className="absolute inset-0 w-full h-full"
-              viewBox="0 0 360 360"
-              fill="none"
-            >
-              <circle
-                cx="180"
-                cy="180"
-                r="170"
-                stroke="rgba(255,255,255,0.12)"
-                strokeWidth="1"
-                strokeDasharray="8 6"
-              />
-            </svg>
-
-            {/* Center icon */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 md:w-20 md:h-20 rounded-full bg-[rgba(179,71,255,0.1)] border border-[rgba(179,71,255,0.3)] flex items-center justify-center">
-              <img src="/images/ghost-mascot.png" alt="GhostPay" className="w-10 h-10 md:w-12 md:h-12 object-contain" />
+          <div className="relative w-[280px] h-[280px] md:w-[360px] md:h-[360px]">
+            {/* Center ghost (static, uncontained) */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+              <img src="/images/ghost-mascot.png" alt="GhostPay" className="w-24 h-24 md:w-32 md:h-32 object-contain drop-shadow-[0_0_20px_rgba(179,71,255,0.4)]" />
             </div>
 
-            {/* Orbit dots */}
-            {orbitIcons.map(({ Icon, angle }, i) => {
-              const rad = (angle * Math.PI) / 180;
-              const r = 170;
-              const x = 180 + r * Math.cos(rad);
-              const y = 180 + r * Math.sin(rad);
-              return (
-                <div
-                  key={i}
-                  ref={(el) => { dotsRef.current[i] = el; }}
-                  className="absolute w-10 h-10 md:w-12 md:h-12 rounded-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] flex items-center justify-center"
-                  style={{
-                    left: `${(x / 360) * 100}%`,
-                    top: `${(y / 360) * 100}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                >
-                  <Icon className="w-5 h-5 md:w-6 md:h-6 text-[#A7B0C8]" strokeWidth={1.5} />
-                </div>
-              );
-            })}
+            {/* Orbit container (spins on scroll) */}
+            <div
+              ref={orbitRef}
+              className="absolute inset-0 opacity-0 z-10"
+            >
+              {/* Orbit ring */}
+              <svg
+                className="absolute inset-0 w-full h-full"
+                viewBox="0 0 360 360"
+                fill="none"
+              >
+                <circle
+                  cx="180"
+                  cy="180"
+                  r="170"
+                  stroke="rgba(255,255,255,0.12)"
+                  strokeWidth="1"
+                  strokeDasharray="8 6"
+                />
+              </svg>
+
+              {/* Orbit dots */}
+              {orbitIcons.map(({ Icon, angle }, i) => {
+                const rad = (angle * Math.PI) / 180;
+                const r = 170;
+                const x = 180 + r * Math.cos(rad);
+                const y = 180 + r * Math.sin(rad);
+                return (
+                  <div
+                    key={i}
+                    ref={(el) => { dotsRef.current[i] = el; }}
+                    className="absolute w-10 h-10 md:w-12 md:h-12 rounded-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] flex items-center justify-center"
+                    style={{
+                      left: `${(x / 360) * 100}%`,
+                      top: `${(y / 360) * 100}%`,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  >
+                    <Icon ref={(el) => { iconRefs.current[i] = el; }} className="w-5 h-5 md:w-6 md:h-6 text-[#A7B0C8]" strokeWidth={1.5} />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 

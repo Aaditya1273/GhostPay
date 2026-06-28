@@ -63,19 +63,22 @@ export default function Section7Pricing() {
       );
 
       // Cards with stagger
-      cardsRef.current.forEach((card) => {
+      cardsRef.current.forEach((card, i) => {
         if (!card) return;
+        const isMiddle = i === 1;
+
         gsap.fromTo(
           card,
-          { y: 90, rotateX: 14, opacity: 0 },
+          { y: 100, rotateX: 14, scale: 0.9, opacity: 0 },
           {
-            y: 0,
+            y: isMiddle ? -20 : 0,
             rotateX: 0,
+            scale: isMiddle ? 1.05 : 1,
             opacity: 1,
             scrollTrigger: {
               trigger: card,
               start: 'top 85%',
-              end: 'top 55%',
+              end: 'top 50%',
               scrub: true,
             },
           }
@@ -117,12 +120,14 @@ export default function Section7Pricing() {
               style={{ transformStyle: 'preserve-3d' }}
             >
               <div
-                className={`p-6 md:p-8 h-full flex flex-col relative ${
-                  plan.highlighted ? '' : ''
+                className={`p-6 md:p-8 h-full flex flex-col relative rounded-3xl transition-all duration-300 ${
+                  plan.highlighted
+                    ? 'glass-card border border-[#B347FF]/30 bg-[rgba(18,15,28,0.8)] shadow-[0_0_40px_rgba(179,71,255,0.15)] z-10'
+                    : 'border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.04)]'
                 }`}
               >
                 {plan.highlighted && (
-                  <div className="absolute inset-0 bg-[rgba(179,71,255,0.03)] rounded-3xl -z-10" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-[#B347FF]/10 to-transparent rounded-3xl pointer-events-none" />
                 )}
                 {/* Plan header */}
                 <div className="mb-6">

@@ -130,54 +130,56 @@ export default function Section4Vault() {
           {/* Inner glow */}
           <div className="absolute inset-0 bg-radial-glow opacity-50 pointer-events-none" />
 
-          {/* Ghost Mascot (locked) - center left */}
-          <div
-            ref={ghostRef}
-            className="absolute left-[8%] md:left-[14%] top-1/2 -translate-y-1/2 w-[30%] md:w-[26%]"
-          >
-            <GhostMascot
-              src="/images/ghost-locked.png"
-              className="w-full h-auto drop-shadow-[0_0_30px_rgba(179,71,255,0.3)]"
-              animate={false}
-            />
-          </div>
-
-          {/* Content block - right side */}
-          <div className="absolute right-6 md:right-12 top-[15%] bottom-[15%] left-[40%] md:left-[44%] flex flex-col justify-center">
-            {/* Text */}
-            <div ref={textRef}>
-              <h2 className="font-heading text-2xl md:text-4xl lg:text-[42px] font-semibold text-[#F4F6FF] mb-3 tracking-tight">
-                Your vault. Your rules.
-              </h2>
-              <p className="text-sm md:text-base text-[#A7B0C8] leading-relaxed max-w-[420px]">
-                End-to-end encryption. Local biometrics. Zero-knowledge architecture.
-              </p>
-            </div>
-
-            {/* Lock icon */}
+          <div className="flex flex-col md:flex-row items-center justify-center gap-12 md:gap-24 h-full w-full px-6 md:px-12 z-10 relative">
+            {/* Ghost Mascot (locked) - left side */}
             <div
-              ref={lockRef}
-              className="mt-6 md:mt-8 flex items-center gap-3"
+              ref={ghostRef}
+              className="w-[50%] md:w-[35%] max-w-[320px]"
             >
-              <div className="w-14 h-14 md:w-16 md:h-16 rounded-full border-2 border-[#B347FF] flex items-center justify-center animate-pulse-slow">
-                <Shield className="w-6 h-6 md:w-7 md:h-7 text-[#B347FF]" strokeWidth={1.5} />
-              </div>
-              <span className="font-heading text-lg md:text-xl font-medium text-[#F4F6FF]">
-                Vault Active
-              </span>
+              <GhostMascot
+                src="/images/ghost-locked.png"
+                className="w-full h-auto drop-shadow-[0_0_30px_rgba(179,71,255,0.3)]"
+                animate={false}
+              />
             </div>
 
-            {/* Status chips */}
-            <div ref={chipsRef} className="mt-6 flex flex-wrap gap-3">
-              {chips.map((chip) => (
-                <div
-                  key={chip.label}
-                  className="status-chip flex items-center gap-2 px-4 py-2 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)]"
-                >
-                  <chip.icon className="w-4 h-4 text-[#B347FF]" strokeWidth={1.5} />
-                  <span className="text-sm text-[#A7B0C8]">{chip.label}</span>
+            {/* Content block - right side */}
+            <div className="flex flex-col justify-center max-w-[480px]">
+              {/* Text */}
+              <div ref={textRef}>
+                <h2 className="font-heading text-2xl md:text-4xl lg:text-[42px] font-semibold text-[#F4F6FF] mb-3 tracking-tight">
+                  Your vault. Your rules.
+                </h2>
+                <p className="text-sm md:text-base text-[#A7B0C8] leading-relaxed max-w-[420px]">
+                  End-to-end encryption. Local biometrics. Zero-knowledge architecture.
+                </p>
+              </div>
+
+              {/* Lock icon */}
+              <div
+                ref={lockRef}
+                className="mt-6 md:mt-8 flex items-center gap-3"
+              >
+                <div className="w-14 h-14 md:w-16 md:h-16 rounded-full border-2 border-[#B347FF] flex items-center justify-center animate-pulse-slow">
+                  <Shield className="w-6 h-6 md:w-7 md:h-7 text-[#B347FF]" strokeWidth={1.5} />
                 </div>
-              ))}
+                <span className="font-heading text-lg md:text-xl font-medium text-[#F4F6FF]">
+                  Vault Active
+                </span>
+              </div>
+
+              {/* Status chips */}
+              <div ref={chipsRef} className="mt-6 flex flex-wrap gap-3">
+                {chips.map((chip) => (
+                  <div
+                    key={chip.label}
+                    className="status-chip flex items-center gap-2 px-4 py-2 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)]"
+                  >
+                    <chip.icon className="w-4 h-4 text-[#B347FF]" strokeWidth={1.5} />
+                    <span className="text-sm text-[#A7B0C8]">{chip.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
