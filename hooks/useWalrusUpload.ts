@@ -17,6 +17,7 @@ import { uploadToWalrus } from "@/lib/WalrusService";
 import { useMemoryTransaction } from "@/hooks/useMemoryTransaction";
 import { useCustomWallet } from "@/contexts/CustomWallet";
 import { saveLocalMemory } from "@/lib/localMemoryStore";
+import clientConfig from "@/config/clientConfig";
 
 export type UploadStep =
   | "idle"
@@ -84,9 +85,9 @@ export function useWalrusUpload() {
 
           try {
             const { encryptedObject } = await encryptWithSeal(
-              { suiClient },
+              { suiClient, packageId: clientConfig.PACKAGE_ID },
               data,
-              address,
+              agentId,
             );
             dataToUpload = encryptedObject;
           } catch (sealErr: any) {

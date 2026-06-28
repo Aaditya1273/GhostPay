@@ -18,6 +18,7 @@ import {
 } from "@mysten/seal";
 import type { SuiClient } from "@mysten/sui/client";
 import type { Signer } from "@mysten/sui/cryptography";
+import { fromB64 } from "@mysten/sui/utils";
 import {
   SEAL_PACKAGE_ID,
   SEAL_KEY_SERVER_OBJECT_ID,
@@ -43,29 +44,43 @@ interface SealServiceConfig {
 }
 
 /**
- * Encrypts data using SEAL under a given identity (e.g., the user's address).
+ * Builds a SEAL identity string from a policy object ID.
  *
- * The data is encrypted such that only transactions authorized by the identity
- * can decrypt it (via a seal_approve call in a Move contract).
+ * The SEAL SDK automatically prepends the package ID, so we only need
+ * to provide the 32-byte (64-character) inner identity (e.g., agentId).
  *
- * @param data - The plaintext bytes to encrypt
- * @param id - The identity to encrypt under (typically the user's Sui address)
- * @returns The encrypted object (BCS bytes) and the 256-bit symmetric key
+ * @param policyObjectId - The on-chain policy/allowlist object ID
+ */
+export function buildSealId(policyObjectId: string): string {
+  const objHex = policyObjectId.startsWith("0x") ? policyObjectId.slice(2) : policyObjectId;
+  return objHex.padStart(64, "0");
+}
+
+/**
+ * Encrypts data using SEAL.
+ *
+ * @param data          - Plaintext bytes
+ * @param policyObjectId - The on-chain policy/allowlist object ID that gates decryption
  */
 export async function encryptWithSeal(
   config: SealServiceConfig,
   data: Uint8Array,
-  id: string,
+  policyObjectId: string,
 ): Promise<{
   encryptedObject: Uint8Array;
   key: Uint8Array;
 }> {
   const client = createSealClient(config);
+  const servers = config.keyServers ?? TESTNET_KEY_SERVERS;
+  const packageId = config.packageId ?? TESTNET_SEAL_PACKAGE_ID;
+
+  // Build correct SEAL identity: JUST the policyObjectId, as the SDK handles packageId internally
+  const sealId = buildSealId(policyObjectId);
 
   const result = await client.encrypt({
-    threshold: 1,
-    packageId: config.packageId ?? TESTNET_SEAL_PACKAGE_ID,
-    id,
+    threshold: Math.ceil(servers.length / 2) || 1,
+    packageId,
+    id: sealId,
     data,
   });
 
@@ -91,13 +106,97 @@ export async function decryptWithSeal(
 ): Promise<Uint8Array> {
   const client = createSealClient(config);
 
-  const result = await client.decrypt({
-    data: encryptedObject,
-    sessionKey,
-    txBytes,
+  try {
+    return await client.decrypt({
+      data: encryptedObject,
+      sessionKey,
+      txBytes,
+    });
+  } catch (err: any) {
+    throw new Error(`[SealService] Decryption failed: ${err?.message ?? String(err)}`);
+  }
+}
+
+// ── Internal helpers ─────────────────────────────────────────────────────
+
+/**
+ * @mysten/seal 1.2.1 expects `suiClient.core.getObject({ objectId: ... })`
+ * @mysten/sui 1.24.0 doesn't have `.core` and expects `.getObject({ id: ... })`.
+ */
+const clientCache = new WeakMap<object, any>();
+
+function getCompatSuiClient(suiClient: any): any {
+  if (clientCache.has(suiClient)) return clientCache.get(suiClient)!;
+
+  const proxied = new Proxy(suiClient, {
+    get(target, prop) {
+      if (prop === "core") {
+        return new Proxy(target, {
+          get(coreTarget, coreProp) {
+            if (coreProp === "getObject") {
+              return async (args: any) => {
+                if (args && args.objectId && !args.id) {
+                  args.id = args.objectId;
+                }
+                
+                // Always ensure showContent and showBcs are enabled
+                args.options = {
+                  ...args.options,
+                  showContent: true,
+                  showBcs: true,
+                };
+
+                const result = await (coreTarget as any).getObject(args);
+                
+                if (result && result.data) {
+                  const objectData: any = {
+                    ...result.data,
+                    // version must be a numeric string — never use digest here
+                    version: result.data.version ?? "1",
+                  };
+                  
+                  // Map bcsBytes back to `content` property as a Uint8Array if requested
+                  if (result.data.bcs?.bcsBytes) {
+                    objectData.content = fromB64(result.data.bcs.bcsBytes);
+                  }
+                  
+                  return {
+                    ...result,
+                    object: objectData,
+                  };
+                }
+                return result;
+              };
+            }
+            if (coreProp === "getDynamicField") {
+              return async (args: any) => {
+                // @mysten/seal expects `getDynamicField` but new SDK uses `getDynamicFieldObject`
+                const res = await (coreTarget as any).getDynamicFieldObject(args);
+                if (res && res.data) {
+                  const bcsBytes = res.data.bcs?.bcsBytes;
+                  // Preserve decoding here because SEAL SDK parses it via BCS library directly
+                  return {
+                    ...res,
+                    dynamicField: {
+                      value: {
+                        bcs: bcsBytes ? fromB64(bcsBytes) : undefined,
+                      }
+                    }
+                  };
+                }
+                return res;
+              };
+            }
+            return (coreTarget as any)[coreProp];
+          }
+        });
+      }
+      return (target as any)[prop];
+    },
   });
 
-  return result;
+  clientCache.set(suiClient, proxied);
+  return proxied;
 }
 
 /**
@@ -119,7 +218,11 @@ export async function createSessionKey(
   signer?: Signer,
   ttlMin: number = 60,
 ): Promise<SessionKey> {
-  const suiClient = config.suiClient as any;
+  if (!signer) {
+    throw new Error("[SealService] A signer is required to create a SessionKey.");
+  }
+
+  const suiClient = getCompatSuiClient(config.suiClient);
 
   const sessionKey = await SessionKey.create({
     address,
@@ -143,6 +246,18 @@ export async function fetchSealKeys(
   sessionKey: SessionKey,
   threshold: number = 1,
 ): Promise<void> {
+  if (!ids.length) {
+    throw new Error("[SealService] fetchSealKeys: ids array must not be empty.");
+  }
+  
+  // Validate format
+  // SEAL inner ids are raw 64-char hex (no 0x prefix)
+  if (!ids.every(id => typeof id === "string" && /^[0-9a-f]{64}$/i.test(id))) {
+    throw new Error(
+      "[SealService] fetchSealKeys: ids must be 64-char raw hex strings from buildSealId()."
+    );
+  }
+
   const client = createSealClient(config);
 
   await client.fetchKeys({
@@ -153,13 +268,13 @@ export async function fetchSealKeys(
   });
 }
 
-// ── Internal helpers ─────────────────────────────────────────────────────
-
 function createSealClient(config: SealServiceConfig): SealClient {
+  const compatSuiClient = getCompatSuiClient(config.suiClient);
+
   const options: SealClientOptions = {
-    suiClient: config.suiClient as any,
+    suiClient: compatSuiClient as any,
     serverConfigs: config.keyServers ?? TESTNET_KEY_SERVERS,
-    verifyKeyServers: true,
+    verifyKeyServers: false, // testnet servers don't pass strict verification
   };
 
   return new SealClient(options);

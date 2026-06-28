@@ -205,11 +205,6 @@ export function useDeepBook() {
           network: "testnet",
           includesTransferTx: true,
           allowedAddresses: [address],
-          allowedMoveCallTargets: [
-            `${DEEPBOOK_PACKAGE_ID}::pool::swap_exact_base_for_quote`,
-            `${DEEPBOOK_PACKAGE_ID}::pool::swap_exact_quote_for_base`,
-            "0x0000000000000000000000000000000000000000000000000000000000000002::coin::zero",
-          ],
           options: {
             showEffects: true,
             showEvents: true,

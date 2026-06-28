@@ -7,7 +7,7 @@ import { useComplianceTransaction } from "@/hooks/useComplianceTransaction";
 import { useAgent } from "@/hooks/useAgentQuery";
 import { useMemories } from "@/hooks/useMemoryQuery";
 import { downloadFromWalrus } from "@/lib/WalrusService";
-import { createSessionKey, decryptWithSeal, fetchSealKeys } from "@/lib/SealService";
+import { createSessionKey, decryptWithSeal, fetchSealKeys, buildSealId } from "@/lib/SealService";
 import { CLOCK_ID } from "@/lib/constants";
 import LayoutShell from "@/components/LayoutShell";
 import { useSuiClient } from "@mysten/dapp-kit";
@@ -189,11 +189,10 @@ export default function CompliancePage() {
       });
       const txBytes = await tx.build({ client: suiClient });
 
-      // 4. Fetch SEAL keys from key servers
-      toast.info("Fetching decryption keys from SEAL key servers…");
+      const sealId = buildSealId(agentAddress!);
       await fetchSealKeys(
         { suiClient, packageId: clientConfig.PACKAGE_ID },
-        [address],
+        [sealId],
         txBytes,
         sessionKey,
       );
