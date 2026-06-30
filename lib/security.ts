@@ -202,6 +202,12 @@ export function validateOrigin(request: NextRequest): boolean {
   ];
 
   const checkOrigin = origin || referer || "";
+  
+  // Allow any vercel preview or production deployment
+  if (checkOrigin.includes(".vercel.app")) {
+    return true;
+  }
+  
   return allowedOrigins.some((allowed) => checkOrigin.startsWith(allowed));
 }
 
